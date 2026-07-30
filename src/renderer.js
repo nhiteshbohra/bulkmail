@@ -75,6 +75,10 @@ document.addEventListener('DOMContentLoaded', () => {
       smtpHost.value = 'smtp.gmail.com';
       smtpPort.value = '587';
       smtpSecure.checked = false;
+    } else if (val === 'brevo') {
+      smtpHost.value = 'smtp-relay.brevo.com';
+      smtpPort.value = '587';
+      smtpSecure.checked = false;
     } else if (val === 'outlook') {
       smtpHost.value = 'smtp.office365.com';
       smtpPort.value = '587';
