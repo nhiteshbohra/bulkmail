@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const XLSX = require('xlsx');
@@ -188,13 +188,4 @@ ipcMain.handle('excel:export-report', async (event, reportData) => {
   } catch (error) {
     return { success: false, error: error.message };
   }
-});
-
-// IPC Handler: Open External URLs in default OS Browser
-ipcMain.handle('shell:open-external', async (event, url) => {
-  if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-    await shell.openExternal(url);
-    return { success: true };
-  }
-  return { success: false, error: 'Invalid URL' };
 });

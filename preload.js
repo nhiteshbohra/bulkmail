@@ -5,6 +5,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   parseFile: (filePath) => ipcRenderer.invoke('excel:parse-file', filePath),
   testSmtp: (config) => ipcRenderer.invoke('smtp:test-connection', config),
   sendEmail: (smtpConfig, mailData) => ipcRenderer.invoke('smtp:send-email', { smtpConfig, mailData }),
-  exportReport: (reportData) => ipcRenderer.invoke('excel:export-report', reportData),
-  openExternal: (url) => ipcRenderer.invoke('shell:open-external', url)
+  exportReport: (reportData) => ipcRenderer.invoke('excel:export-report', reportData)
 });
