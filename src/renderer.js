@@ -68,15 +68,157 @@ document.addEventListener('DOMContentLoaded', () => {
   const filterCountFailed = document.getElementById('filterCountFailed');
   const filterCountPending = document.getElementById('filterCountPending');
 
+  // Google Sign-In DOM Elements
+  const googleAuthBox = document.getElementById('googleAuthBox');
+  const googleConnectedBox = document.getElementById('googleConnectedBox');
+  const googleConnectedEmail = document.getElementById('googleConnectedEmail');
+  const btnGoogleSignIn = document.getElementById('btnGoogleSignIn');
+  const btnSignOutGoogle = document.getElementById('btnSignOutGoogle');
+
+  const googleAuthModal = document.getElementById('googleAuthModal');
+  const btnCloseGoogleModal = document.getElementById('btnCloseGoogleModal');
+  const btnCancelGoogleModal = document.getElementById('btnCancelGoogleModal');
+  const btnConfirmGoogleAuth = document.getElementById('btnConfirmGoogleAuth');
+  const btnOpenAppPassPage = document.getElementById('btnOpenAppPassPage');
+  const googleEmailInput = document.getElementById('googleEmailInput');
+  const googlePassInput = document.getElementById('googlePassInput');
+  const googleModalFeedback = document.getElementById('googleModalFeedback');
+
+  // Google Sign-In Modal Handlers
+  if (btnGoogleSignIn) {
+    btnGoogleSignIn.addEventListener('click', () => {
+      googleModalFeedback.classList.add('hidden');
+      googleEmailInput.value = smtpUser.value || '';
+      googlePassInput.value = smtpPass.value || '';
+      googleAuthModal.classList.remove('hidden');
+    });
+  }
+
+  if (btnCloseGoogleModal) {
+    btnCloseGoogleModal.addEventListener('click', () => googleAuthModal.classList.add('hidden'));
+  }
+  if (btnCancelGoogleModal) {
+    btnCancelGoogleModal.addEventListener('click', () => googleAuthModal.classList.add('hidden'));
+  }
+
+  if (btnOpenAppPassPage) {
+    btnOpenAppPassPage.addEventListener('click', () => {
+      if (window.electronAPI.openExternal) {
+        window.electronAPI.openExternal('https://myaccount.google.com/apppasswords');
+      }
+    });
+  }
+
+  if (btnConfirmGoogleAuth) {
+    btnConfirmGoogleAuth.addEventListener('click', async () => {
+      const email = googleEmailInput.value.trim();
+      const pass = googlePassInput.value.trim();
+
+      if (!email || !email.includes('@')) {
+        showGoogleModalFeedback(false, 'Please enter a valid Google Gmail address.');
+        return;
+      }
+      if (!pass) {
+        showGoogleModalFeedback(false, 'Please enter your 16-character Google App Password.');
+        return;
+      }
+
+      btnConfirmGoogleAuth.disabled = true;
+      btnConfirmGoogleAuth.textContent = 'Verifying Google Account...';
+      googleModalFeedback.classList.add('hidden');
+
+      // Set Gmail SMTP values
+      smtpHost.value = 'smtp.gmail.com';
+      smtpPort.value = '587';
+      smtpSecure.checked = false;
+      smtpUser.value = email;
+      smtpPass.value = pass;
+      presetSelect.value = 'gmail';
+
+      const config = getSmtpConfig();
+      const result = await window.electronAPI.testSmtp(config);
+
+      btnConfirmGoogleAuth.disabled = false;
+      btnConfirmGoogleAuth.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Sign In & Connect`;
+
+      if (result.success) {
+        state.smtpVerified = true;
+        updateSmtpStatus(true);
+        setGoogleConnectedUI(email);
+
+        // Save Google Auth in localStorage
+        try {
+          localStorage.setItem('google_auth', JSON.stringify({ email, pass }));
+        } catch (e) {}
+
+        googleAuthModal.classList.add('hidden');
+        showSmtpFeedback(true, `Signed in as ${email}! Google Account connected successfully.`);
+        updateStartButtonState();
+      } else {
+        showGoogleModalFeedback(false, `Google Auth Failed: ${result.error}`);
+      }
+    });
+  }
+
+  if (btnSignOutGoogle) {
+    btnSignOutGoogle.addEventListener('click', () => {
+      try {
+        localStorage.removeItem('google_auth');
+      } catch (e) {}
+      googleConnectedBox.classList.add('hidden');
+      googleAuthBox.classList.remove('hidden');
+      smtpUser.value = '';
+      smtpPass.value = '';
+      state.smtpVerified = false;
+      updateSmtpStatus(false);
+      showSmtpFeedback(false, 'Signed out of Google Account.');
+      updateStartButtonState();
+    });
+  }
+
+  function setGoogleConnectedUI(email) {
+    googleConnectedEmail.textContent = email;
+    googleAuthBox.classList.add('hidden');
+    googleConnectedBox.classList.remove('hidden');
+  }
+
+  function showGoogleModalFeedback(isSuccess, message) {
+    googleModalFeedback.className = `alert-box ${isSuccess ? 'success' : 'error'}`;
+    googleModalFeedback.textContent = message;
+    googleModalFeedback.classList.remove('hidden');
+  }
+
+  // Restore saved Google Auth on startup
+  try {
+    const saved = localStorage.getItem('google_auth');
+    if (saved) {
+      const { email, pass } = JSON.parse(saved);
+      if (email && pass) {
+        smtpHost.value = 'smtp.gmail.com';
+        smtpPort.value = '587';
+        smtpSecure.checked = false;
+        smtpUser.value = email;
+        smtpPass.value = pass;
+        presetSelect.value = 'gmail';
+        setGoogleConnectedUI(email);
+        
+        // Background verify
+        window.electronAPI.testSmtp(getSmtpConfig()).then(res => {
+          if (res.success) {
+            state.smtpVerified = true;
+            updateSmtpStatus(true);
+            updateStartButtonState();
+          }
+        });
+      }
+    }
+  } catch (e) {}
+
   // Initialize Preset Listener
   presetSelect.addEventListener('change', (e) => {
     const val = e.target.value;
     if (val === 'gmail') {
       smtpHost.value = 'smtp.gmail.com';
-      smtpPort.value = '587';
-      smtpSecure.checked = false;
-    } else if (val === 'brevo') {
-      smtpHost.value = 'smtp-relay.brevo.com';
       smtpPort.value = '587';
       smtpSecure.checked = false;
     } else if (val === 'outlook') {
