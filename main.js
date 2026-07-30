@@ -3,7 +3,6 @@ const path = require('path');
 const fs = require('fs');
 const XLSX = require('xlsx');
 const nodemailer = require('nodemailer');
-const puppeteer = require('puppeteer-core');
 
 let mainWindow;
 let activeBrowser = null;
@@ -84,6 +83,10 @@ async function getOrCreateBrowser(headless = false) {
   }
 
   const userDataDir = getGmailProfilePath();
+
+  // Dynamic import for ES Module puppeteer-core
+  const puppeteerModule = await import('puppeteer-core');
+  const puppeteer = puppeteerModule.default || puppeteerModule;
 
   activeBrowser = await puppeteer.launch({
     headless: headless,
