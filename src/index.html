@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoMail Excel - Bulk Email Automation</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        </div>
+        <div class="brand-text">
+          <h1>AutoMail <span class="badge-pro">EXCEL</span></h1>
+          <p>Automated Email Dispatcher from Excel Spreadsheets</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div id="smtpStatusBadge" class="status-indicator disconnected">
+          <span class="dot"></span>
+          <span class="text">SMTP: Not Verified</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-content">
+      <div class="grid-layout">
+
+        <!-- Column 1: Configuration & Import Setup -->
+        <div class="column setup-column">
+          
+          <!-- Card 1: SMTP Settings -->
+          <section class="card glass-panel">
+            <div class="card-header">
+              <h2>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                1. SMTP Credentials
+              </h2>
+              <div class="preset-selector">
+                <select id="presetSelect" title="Select Quick Preset">
+                  <option value="custom">Custom SMTP</option>
+                  <option value="gmail">Gmail / Google Workspace</option>
+                  <option value="outlook">Outlook / Office365</option>
+                  <option value="yahoo">Yahoo Mail</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group col-8">
+                <label for="smtpHost">SMTP Server Host</label>
+                <input type="text" id="smtpHost" placeholder="smtp.gmail.com" value="smtp.gmail.com">
+              </div>
+              <div class="form-group col-4">
+                <label for="smtpPort">Port</label>
+                <input type="number" id="smtpPort" placeholder="587" value="587">
+              </div>
+
+              <div class="form-group col-12 checkbox-group">
+                <input type="checkbox" id="smtpSecure">
+                <label for="smtpSecure">Use SSL/TLS (Required for Port 465)</label>
+              </div>
+
+              <div class="form-group col-12">
+                <label for="smtpUser">Sender Email / User</label>
+                <input type="email" id="smtpUser" placeholder="your.name@gmail.com">
+              </div>
+
+              <div class="form-group col-12">
+                <label for="smtpPass">Password / App Password</label>
+                <input type="password" id="smtpPass" placeholder="••••••••••••••••">
+                <span class="input-hint">For Gmail, use an generated 16-character App Password.</span>
+              </div>
+
+              <div class="form-group col-12">
+                <label for="smtpFromName">Display Name (From Name)</label>
+                <input type="text" id="smtpFromName" placeholder="John Doe Marketing">
+              </div>
+            </div>
+
+            <div class="card-footer">
+              <button id="btnTestSmtp" class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                Test Connection
+              </button>
+            </div>
+            <div id="smtpFeedback" class="alert-box hidden"></div>
+          </section>
+
+          <!-- Card 2: Excel / CSV Import -->
+          <section class="card glass-panel">
+            <div class="card-header">
+              <h2>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M10 9h2"/></svg>
+                2. Select Excel File & Mapping
+              </h2>
+            </div>
+
+            <div class="drop-zone" id="dropZone">
+              <div class="drop-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+              <p class="drop-title">Drop your Excel file here or click to browse</p>
+              <p class="drop-subtitle">Supports .xlsx, .xls, .csv</p>
+              <button id="btnSelectFile" class="btn btn-outline btn-sm">Choose File</button>
+            </div>
+
+            <div id="fileInfoBox" class="file-info-box hidden">
+              <div class="file-details">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>
+                <div>
+                  <div id="fileNameText" class="file-name">filename.xlsx</div>
+                  <div id="fileRowsCount" class="file-count">0 rows loaded</div>
+                </div>
+              </div>
+              <button id="btnRemoveFile" class="btn-icon" title="Remove file">&times;</button>
+            </div>
+
+            <!-- Mapping Controls -->
+            <div id="mappingSection" class="mapping-section hidden">
+              <div class="section-subtitle">Map Columns to Email Fields</div>
+
+              <div class="form-group">
+                <label for="mapEmail">Recipient Email Address Column <span class="required">*</span></label>
+                <select id="mapEmail" class="select-highlight"></select>
+              </div>
+
+              <div class="form-group">
+                <label for="mapTopic">Email Topic / Subject Column <span class="required">*</span></label>
+                <select id="mapTopic" class="select-highlight"></select>
+              </div>
+
+              <div class="form-group">
+                <label for="mapBody">Email Body Column <span class="required">*</span></label>
+                <select id="mapBody" class="select-highlight"></select>
+              </div>
+
+              <div class="form-group checkbox-group" style="margin-top: 6px; background: rgba(59, 130, 246, 0.06); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(59, 130, 246, 0.15);">
+                <input type="checkbox" id="splitMultipleEmails" checked>
+                <label for="splitMultipleEmails" style="font-size: 0.78rem; font-weight: 500; cursor: pointer;">
+                  Split multi-email cells (e.g., 3-4 IDs separated by <code>,</code> or <code>;</code>) into individual recipients
+                </label>
+              </div>
+
+              <div class="template-tip">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <span>Variables in Excel (e.g., <code>{FIRST_NAME}</code>) will automatically be parsed per recipient!</span>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- Column 2: Automation Controls & Live Log Monitor -->
+        <div class="column monitor-column">
+
+          <!-- Card 3: Execution Controls & Metrics -->
+          <section class="card glass-panel">
+            <div class="card-header">
+              <h2>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                3. Automation Controls
+              </h2>
+              <div class="delay-setting">
+                <label for="emailDelay">Delay per Email:</label>
+                <input type="number" id="emailDelay" min="0" max="60" value="2">
+                <span class="unit">sec</span>
+              </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-section">
+              <div class="progress-info">
+                <span id="progressText">Ready to start campaign</span>
+                <span id="progressPercent">0%</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div id="progressBarFill" class="progress-bar-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="control-actions">
+              <button id="btnStart" class="btn btn-primary btn-lg" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Start Campaign
+              </button>
+
+              <button id="btnPause" class="btn btn-warning btn-lg hidden">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                Pause
+              </button>
+
+              <button id="btnResume" class="btn btn-success btn-lg hidden">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Resume
+              </button>
+
+              <button id="btnStop" class="btn btn-danger btn-lg hidden">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"/></svg>
+                Stop
+              </button>
+            </div>
+
+            <!-- Metrics Counters -->
+            <div class="metrics-grid">
+              <div class="metric-card total">
+                <div class="metric-value" id="metricTotal">0</div>
+                <div class="metric-label">Total Recipients</div>
+              </div>
+              <div class="metric-card success">
+                <div class="metric-value" id="metricSent">0</div>
+                <div class="metric-label">Sent</div>
+              </div>
+              <div class="metric-card failed">
+                <div class="metric-value" id="metricFailed">0</div>
+                <div class="metric-label">Failed</div>
+              </div>
+              <div class="metric-card pending">
+                <div class="metric-value" id="metricPending">0</div>
+                <div class="metric-label">Pending</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Card 4: Live Activity Table -->
+          <section class="card glass-panel log-card">
+            <div class="card-header">
+              <h2>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                4. Real-time Activity Log
+              </h2>
+              <div class="log-actions">
+                <button id="btnExportReport" class="btn btn-secondary btn-sm" disabled>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Export Report
+                </button>
+              </div>
+            </div>
+
+            <!-- Table Filters & Search -->
+            <div class="table-toolbar">
+              <div class="filter-tabs">
+                <button class="tab-btn active" data-filter="all">All (<span id="filterCountAll">0</span>)</button>
+                <button class="tab-btn" data-filter="sent">Sent (<span id="filterCountSent">0</span>)</button>
+                <button class="tab-btn" data-filter="failed">Failed (<span id="filterCountFailed">0</span>)</button>
+                <button class="tab-btn" data-filter="pending">Pending (<span id="filterCountPending">0</span>)</button>
+              </div>
+              <div class="search-box">
+                <input type="text" id="logSearch" placeholder="Search email or topic...">
+              </div>
+            </div>
+
+            <!-- Scrollable Table -->
+            <div class="table-container">
+              <table id="logTable">
+                <thead>
+                  <tr>
+                    <th style="width: 50px;">#</th>
+                    <th>Recipient Email</th>
+                    <th>Topic / Subject</th>
+                    <th style="width: 110px;">Status</th>
+                    <th style="width: 100px;">Time</th>
+                    <th>Details / Error</th>
+                  </tr>
+                </thead>
+                <tbody id="logTableBody">
+                  <tr class="empty-row">
+                    <td colspan="6">No Excel file loaded yet. Load a file above to preview recipients.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

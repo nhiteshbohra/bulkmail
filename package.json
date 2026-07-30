@@ -1,0 +1,25 @@
+{
+  "name": "electron-excel-mailer",
+  "version": "1.0.0",
+  "description": "Desktop application to automate email sending from Excel spreadsheets",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [
+    "electron",
+    "email",
+    "excel",
+    "automation",
+    "nodemailer"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "nodemailer": "^6.9.13",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^29.1.0"
+  }
+}
