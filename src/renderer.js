@@ -79,7 +79,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnCloseGoogleModal = document.getElementById('btnCloseGoogleModal');
   const btnCancelGoogleModal = document.getElementById('btnCancelGoogleModal');
   const btnConfirmGoogleAuth = document.getElementById('btnConfirmGoogleAuth');
-  const btnOpenAppPassPage = document.getElementById('btnOpenAppPassPage');
   const googleEmailInput = document.getElementById('googleEmailInput');
   const googlePassInput = document.getElementById('googlePassInput');
   const googleModalFeedback = document.getElementById('googleModalFeedback');
@@ -99,14 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (btnCancelGoogleModal) {
     btnCancelGoogleModal.addEventListener('click', () => googleAuthModal.classList.add('hidden'));
-  }
-
-  if (btnOpenAppPassPage) {
-    btnOpenAppPassPage.addEventListener('click', () => {
-      if (window.electronAPI.openExternal) {
-        window.electronAPI.openExternal('https://myaccount.google.com/apppasswords');
-      }
-    });
   }
 
   if (btnConfirmGoogleAuth) {
