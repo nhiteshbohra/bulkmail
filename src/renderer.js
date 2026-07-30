@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const logTableBody = document.getElementById('logTableBody');
   const btnExportReport = document.getElementById('btnExportReport');
+  const btnResetLogs = document.getElementById('btnResetLogs');
   const logSearch = document.getElementById('logSearch');
   const filterTabs = document.querySelectorAll('.tab-btn');
 
@@ -454,6 +455,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (total > 0) {
       btnExportReport.disabled = false;
+      if (btnResetLogs) btnResetLogs.disabled = (state.status !== 'idle');
+    } else {
+      if (btnResetLogs) btnResetLogs.disabled = true;
     }
   }
 
@@ -503,12 +507,11 @@ document.addEventListener('DOMContentLoaded', () => {
       // Handle Pause Request
       while (state.pauseRequested) {
         if (state.stopRequested) break;
-        await sleep(500);
+        await sleep(200);
       }
 
       // Handle Stop Request
       if (state.stopRequested) {
-        state.status = 'stopped';
         break;
       }
 
@@ -537,6 +540,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const res = await window.electronAPI.sendEmail(smtpConfig, mailData);
 
+      // If stop was requested while email was sending
+      if (state.stopRequested) {
+        item.status = 'pending';
+        updateSingleRowUI(item);
+        break;
+      }
+
       if (res.success) {
         item.status = 'sent';
         item.sentTime = new Date().toLocaleTimeString();
@@ -550,24 +560,30 @@ document.addEventListener('DOMContentLoaded', () => {
       updateSingleRowUI(item);
       updateMetrics();
 
-      // Inter-email Delay
+      // Inter-email Delay (Interruptible)
       if (delaySec > 0 && i < state.campaignLogs.length - 1 && !state.stopRequested) {
-        await sleep(delaySec * 1000);
+        await interruptibleSleep(delaySec * 1000);
       }
     }
 
-    // Campaign Finished or Stopped
-    if (!state.stopRequested && !state.pauseRequested) {
-      state.status = 'idle';
-    }
+    // Always reset state status back to 'idle' when loop terminates or stops
+    state.status = 'idle';
+    state.stopRequested = false;
+    state.pauseRequested = false;
+
+    // Reset any hanging 'sending' status rows back to 'pending'
+    state.campaignLogs.forEach(l => {
+      if (l.status === 'sending') l.status = 'pending';
+    });
 
     btnStart.classList.remove('hidden');
     btnPause.classList.add('hidden');
     btnResume.classList.add('hidden');
     btnStop.classList.add('hidden');
     setInputsDisabled(false);
-    updateStartButtonState();
+    renderLogTable();
     updateMetrics();
+    updateStartButtonState();
   }
 
   function pauseCampaign() {
@@ -589,14 +605,31 @@ document.addEventListener('DOMContentLoaded', () => {
   function stopCampaign() {
     state.stopRequested = true;
     state.pauseRequested = false;
-    state.status = 'stopped';
+    state.status = 'idle'; // Reset status to idle immediately!
+
+    // Reset any hanging 'sending' status rows back to 'pending'
+    state.campaignLogs.forEach(l => {
+      if (l.status === 'sending') l.status = 'pending';
+    });
+
     btnPause.classList.add('hidden');
     btnResume.classList.add('hidden');
     btnStop.classList.add('hidden');
     btnStart.classList.remove('hidden');
     setInputsDisabled(false);
-    updateStartButtonState();
+    renderLogTable();
     updateMetrics();
+    updateStartButtonState();
+  }
+
+  async function interruptibleSleep(ms) {
+    const step = 100;
+    let elapsed = 0;
+    while (elapsed < ms) {
+      if (state.stopRequested) break;
+      await new Promise(r => setTimeout(r, Math.min(step, ms - elapsed)));
+      elapsed += step;
+    }
   }
 
   function updateSingleRowUI(item) {
@@ -651,5 +684,22 @@ document.addEventListener('DOMContentLoaded', () => {
       alert(`Failed to export report: ${res.error}`);
     }
   });
+
+  // Reset Statuses Button Event
+  if (btnResetLogs) {
+    btnResetLogs.addEventListener('click', () => {
+      if (state.status !== 'idle') return;
+      if (confirm('Reset all recipient statuses back to pending?')) {
+        state.campaignLogs.forEach(item => {
+          item.status = 'pending';
+          item.sentTime = '-';
+          item.error = '-';
+        });
+        renderLogTable();
+        updateMetrics();
+        updateStartButtonState();
+      }
+    });
+  }
 
 });

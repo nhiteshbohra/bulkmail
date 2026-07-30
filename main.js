@@ -132,7 +132,10 @@ ipcMain.handle('smtp:send-email', async (event, { smtpConfig, mailData }) => {
       auth: {
         user: smtpConfig.user,
         pass: smtpConfig.pass
-      }
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000
     });
 
     const mailOptions = {
