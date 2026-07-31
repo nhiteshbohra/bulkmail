@@ -274,6 +274,16 @@ select {
   transition: var(--transition-fast);
 }
 
+select option {
+  background-color: #121826;
+  color: #f8fafc;
+  padding: 8px;
+}
+
+select option:disabled {
+  color: var(--text-muted);
+}
+
 input:focus, select:focus {
   border-color: var(--border-focus);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);

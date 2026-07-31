@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const mapEmail = document.getElementById('mapEmail');
   const mapTopic = document.getElementById('mapTopic');
   const mapBody = document.getElementById('mapBody');
+  const mapAttachment = document.getElementById('mapAttachment');
   const splitMultipleEmails = document.getElementById('splitMultipleEmails');
 
   const emailDelay = document.getElementById('emailDelay');
@@ -77,80 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const filterCountSent = document.getElementById('filterCountSent');
   const filterCountFailed = document.getElementById('filterCountFailed');
   const filterCountPending = document.getElementById('filterCountPending');
-
-  // Mode Switcher Logic (Gmail Web vs SMTP)
-  if (modeWebBtn && modeSmtpBtn) {
-    modeWebBtn.addEventListener('click', () => {
-      state.sendMode = 'web';
-      modeWebBtn.classList.add('active');
-      modeWebBtn.style.background = 'var(--accent-blue)';
-      modeWebBtn.style.color = '#fff';
-      modeSmtpBtn.classList.remove('active');
-      modeSmtpBtn.style.background = 'transparent';
-      modeSmtpBtn.style.color = 'var(--text-secondary)';
-
-      if (webEnginePanel) webEnginePanel.classList.remove('hidden');
-      if (smtpEnginePanel) smtpEnginePanel.classList.add('hidden');
-      updateStartButtonState();
-    });
-
-    modeSmtpBtn.addEventListener('click', () => {
-      state.sendMode = 'smtp';
-      modeSmtpBtn.classList.add('active');
-      modeSmtpBtn.style.background = 'var(--accent-blue)';
-      modeSmtpBtn.style.color = '#fff';
-      modeWebBtn.classList.remove('active');
-      modeWebBtn.style.background = 'transparent';
-      modeWebBtn.style.color = 'var(--text-secondary)';
-
-      if (smtpEnginePanel) smtpEnginePanel.classList.remove('hidden');
-      if (webEnginePanel) webEnginePanel.classList.add('hidden');
-      updateStartButtonState();
-    });
-  }
-
-  // Google Sign In Handler
-  if (btnGoogleSignIn) {
-    btnGoogleSignIn.addEventListener('click', async () => {
-      btnGoogleSignIn.disabled = true;
-      btnGoogleSignIn.textContent = 'Opening Chrome...';
-      const res = await window.electronAPI.launchGoogleLogin();
-      btnGoogleSignIn.disabled = false;
-      btnGoogleSignIn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg> Sign In with Google (Chrome Profile)`;
-      
-      if (res.success) {
-        alert(res.message);
-      } else {
-        alert(`Error opening Chrome: ${res.error}`);
-      }
-    });
-  }
-
-  if (btnCheckGoogleAuth) {
-    btnCheckGoogleAuth.addEventListener('click', checkGoogleAuthStatus);
-  }
-
-  async function checkGoogleAuthStatus() {
-    if (!btnCheckGoogleAuth) return;
-    btnCheckGoogleAuth.disabled = true;
-    btnCheckGoogleAuth.textContent = 'Checking...';
-    
-    const res = await window.electronAPI.checkGoogleAuth();
-    btnCheckGoogleAuth.disabled = false;
-    btnCheckGoogleAuth.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Verify Sign-In`;
-
-    state.googleSignedIn = res.signedIn;
-    if (googleAuthBadge) {
-      if (res.signedIn) {
-        googleAuthBadge.className = 'status-indicator connected';
-        googleAuthBadge.querySelector('.text').textContent = 'Signed In';
-      } else {
-        googleAuthBadge.className = 'status-indicator disconnected';
-        googleAuthBadge.querySelector('.text').textContent = 'Not Signed In';
-      }
-    }
-    updateStartButtonState();
-  }
 
   // Initialize Preset Listener
   if (presetSelect) {
@@ -317,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function populateMappingDropdowns(headers) {
-    const selectElements = [mapEmail, mapTopic, mapBody];
+    const selectElements = [mapEmail, mapTopic, mapBody, mapAttachment].filter(Boolean);
 
     selectElements.forEach(select => {
       select.innerHTML = '<option value="">-- Select Column --</option>';
@@ -341,12 +268,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!mapBody.value && (lower.includes('body') || lower.includes('content') || lower.includes('message') || lower.includes('text'))) {
         mapBody.value = h;
       }
+      if (mapAttachment && !mapAttachment.value && (lower.includes('attach') || lower.includes('file') || lower.includes('document'))) {
+        mapAttachment.value = h;
+      }
     });
 
     // Add change listeners to rebuild log preview dynamically
     mapEmail.addEventListener('change', onMappingChanged);
     mapTopic.addEventListener('change', onMappingChanged);
     mapBody.addEventListener('change', onMappingChanged);
+    if (mapAttachment) mapAttachment.addEventListener('change', onMappingChanged);
     if (splitMultipleEmails) {
       splitMultipleEmails.addEventListener('change', onMappingChanged);
     }
@@ -373,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const emailCol = mapEmail.value;
     const topicCol = mapTopic.value;
     const bodyCol = mapBody.value;
+    const attachmentCol = mapAttachment ? mapAttachment.value : '';
     const shouldSplit = splitMultipleEmails ? splitMultipleEmails.checked : true;
 
     state.campaignLogs = [];
@@ -382,10 +314,12 @@ document.addEventListener('DOMContentLoaded', () => {
       let recipientRaw = emailCol ? String(row[emailCol] || '').trim() : '';
       let topicRaw = topicCol ? String(row[topicCol] || '') : '';
       let bodyRaw = bodyCol ? String(row[bodyCol] || '') : '';
+      let attachmentRaw = attachmentCol ? String(row[attachmentCol] || '').trim() : '';
 
       // Substitute row variables for placeholders e.g., {COLUMN_NAME}
       let finalTopic = interpolateTemplate(topicRaw, row);
       let finalBody = interpolateTemplate(bodyRaw, row);
+      let finalAttachment = interpolateTemplate(attachmentRaw, row);
 
       const parsedEmails = extractEmails(recipientRaw);
 
@@ -398,6 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
             recipientEmail: singleEmail,
             topic: finalTopic,
             body: finalBody,
+            attachmentPath: finalAttachment,
             status: 'pending', // 'pending' | 'sending' | 'sent' | 'failed'
             sentTime: '-',
             error: '-'
@@ -411,6 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
           recipientEmail: parsedEmails.join(', '),
           topic: finalTopic,
           body: finalBody,
+          attachmentPath: finalAttachment,
           status: 'pending',
           sentTime: '-',
           error: '-'
@@ -422,6 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
           recipientEmail: recipientRaw,
           topic: finalTopic,
           body: finalBody,
+          attachmentPath: finalAttachment,
           status: 'pending',
           sentTime: '-',
           error: '-'
@@ -446,16 +383,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasEmailMap = mapEmail.value !== '';
     const hasTopicMap = mapTopic.value !== '';
     const hasBodyMap = mapBody.value !== '';
+    const hasHost = smtpHost.value.trim() !== '';
 
-    let isReady = false;
-    if (state.sendMode === 'web') {
-      isReady = hasData && hasEmailMap && hasTopicMap && hasBodyMap && state.status === 'idle';
-    } else {
-      const hasHost = smtpHost.value.trim() !== '';
-      isReady = hasData && hasEmailMap && hasTopicMap && hasBodyMap && hasHost && state.status === 'idle';
-    }
-
-    btnStart.disabled = !isReady;
+    btnStart.disabled = !(hasData && hasEmailMap && hasTopicMap && hasBodyMap && hasHost && state.status === 'idle');
   }
 
   // Render Log Table with Filtering & Search
@@ -577,12 +507,10 @@ document.addEventListener('DOMContentLoaded', () => {
   btnStop.addEventListener('click', stopCampaign);
 
   async function startCampaign() {
-    if (state.sendMode === 'smtp') {
-      const smtpConfig = getSmtpConfig();
-      if (!smtpConfig.host || !smtpConfig.user || !smtpConfig.pass) {
-        alert('Please fill out your SMTP Server, User, and Password credentials first!');
-        return;
-      }
+    const smtpConfig = getSmtpConfig();
+    if (!smtpConfig.host || !smtpConfig.user || !smtpConfig.pass) {
+      alert('Please fill out your SMTP Server, User, and Password credentials first!');
+      return;
     }
 
     state.status = 'running';
@@ -596,7 +524,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setInputsDisabled(true);
 
     const delaySec = parseInt(emailDelay.value, 10) || 0;
-    const smtpConfig = getSmtpConfig();
 
     for (let i = 0; i < state.campaignLogs.length; i++) {
       const item = state.campaignLogs[i];
@@ -630,20 +557,16 @@ document.addEventListener('DOMContentLoaded', () => {
       updateSingleRowUI(item);
       updateMetrics();
 
-      // Dispatch Email depending on selected mode (Gmail Web vs SMTP)
+      // Dispatch Email via SMTP
       const mailData = {
         to: item.recipientEmail,
         subject: item.topic,
         body: item.body,
+        attachmentPath: item.attachmentPath,
         isHtml: false
       };
 
-      let res;
-      if (state.sendMode === 'web') {
-        res = await window.electronAPI.sendEmailWeb(mailData);
-      } else {
-        res = await window.electronAPI.sendEmail(smtpConfig, mailData);
-      }
+      const res = await window.electronAPI.sendEmail(smtpConfig, mailData);
 
       // If stop was requested while email was sending
       if (state.stopRequested) {
@@ -761,10 +684,9 @@ document.addEventListener('DOMContentLoaded', () => {
     mapEmail.disabled = disabled;
     mapTopic.disabled = disabled;
     mapBody.disabled = disabled;
+    if (mapAttachment) mapAttachment.disabled = disabled;
     emailDelay.disabled = disabled;
     if (btnTestSmtp) btnTestSmtp.disabled = disabled;
-    if (btnGoogleSignIn) btnGoogleSignIn.disabled = disabled;
-    if (btnCheckGoogleAuth) btnCheckGoogleAuth.disabled = disabled;
   }
 
   function sleep(ms) {
@@ -779,6 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'ID': l.id,
       'Recipient Email': l.recipientEmail,
       'Topic / Subject': l.topic,
+      'Attachment Path': l.attachmentPath || '-',
       'Status': l.status,
       'Time': l.sentTime,
       'Error Details': l.error

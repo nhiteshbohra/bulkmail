@@ -47,48 +47,10 @@
               </h2>
             </div>
 
-            <!-- Mode Switcher Tabs -->
-            <div class="engine-mode-switcher" style="display: flex; gap: 8px; margin-bottom: 14px; background: rgba(0,0,0,0.35); padding: 4px; border-radius: var(--radius-sm); border: 1px solid var(--border-card);">
-              <button id="modeWebBtn" class="mode-tab-btn active" style="flex: 1; padding: 8px; font-size: 0.78rem; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; background: var(--accent-blue); color: #fff;">
-                🌐 Gmail Web (Chrome)
-              </button>
-              <button id="modeSmtpBtn" class="mode-tab-btn" style="flex: 1; padding: 8px; font-size: 0.78rem; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; background: transparent; color: var(--text-secondary);">
-                ⚡ SMTP Server
-              </button>
-            </div>
-
-            <!-- Gmail Web Panel (Default) -->
-            <div id="webEnginePanel" class="engine-panel">
-              <div class="template-tip" style="margin-bottom: 12px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                <span>No App Passwords required! Sign in to Google once in Chrome, and the app will compose & send directly via Gmail Web.</span>
-              </div>
-
-              <div style="display: flex; flex-direction: column; gap: 10px;">
-                <button id="btnGoogleSignIn" class="btn btn-primary col-12" style="padding: 10px; background: linear-gradient(135deg, #4285f4, #34a853); font-weight: 600;">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
-                  Sign In with Google (Chrome Profile)
-                </button>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-card);">
-                  <div style="font-size: 0.78rem; font-weight: 500;">Google Web Auth Status:</div>
-                  <div id="googleAuthBadge" class="status-indicator disconnected">
-                    <span class="dot"></span>
-                    <span class="text">Not Checked</span>
-                  </div>
-                </div>
-
-                <button id="btnCheckGoogleAuth" class="btn btn-secondary btn-sm" style="align-self: flex-end;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                  Verify Sign-In
-                </button>
-              </div>
-            </div>
-
-            <!-- SMTP Panel (Hidden by default) -->
-            <div id="smtpEnginePanel" class="engine-panel hidden">
-              <div class="card-header" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-card);">
-                <h2>Custom SMTP Presets</h2>
+            <!-- SMTP Panel -->
+            <div id="smtpEnginePanel" class="engine-panel">
+              <div class="card-header" style="padding-bottom: 6px;">
+                <h2>SMTP Credentials & Presets</h2>
                 <div class="preset-selector">
                   <select id="presetSelect" title="Select Quick Preset">
                     <option value="custom">Custom SMTP</option>
@@ -122,7 +84,7 @@
                 <div class="form-group col-12">
                   <label for="smtpPass">Password / App Password</label>
                   <input type="password" id="smtpPass" placeholder="••••••••••••••••">
-                  <span class="input-hint">For Gmail, use an generated 16-character App Password.</span>
+                  <span class="input-hint">For Gmail, use a generated 16-character App Password.</span>
                 </div>
 
                 <div class="form-group col-12">
@@ -188,6 +150,11 @@
               <div class="form-group">
                 <label for="mapBody">Email Body Column <span class="required">*</span></label>
                 <select id="mapBody" class="select-highlight"></select>
+              </div>
+
+              <div class="form-group">
+                <label for="mapAttachment">Attachment File Path Column <span style="font-weight: normal; color: var(--text-secondary);">(Optional)</span></label>
+                <select id="mapAttachment" class="select-highlight"></select>
               </div>
 
               <div class="form-group checkbox-group" style="margin-top: 6px; background: rgba(59, 130, 246, 0.06); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(59, 130, 246, 0.15);">
