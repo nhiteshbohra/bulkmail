@@ -13,7 +13,7 @@
     "automation",
     "nodemailer"
   ],
-  "author": "",
+  "author": "Hitesh Bohra",
   "license": "ISC",
   "dependencies": {
     "nodemailer": "^6.9.13",

@@ -1,4 +1,5 @@
-# 📧 AutoMail Excel (Bulk Email Dispatcher)
+# 📧 AutoMail Pro - Bulk Email Dispatcher
+> **Made with ❤️ by Hitesh Bohra**
 
 [![Electron](https://img.shields.io/badge/Electron-29.1.0-47848F?style=for-the-badge&logo=electron&logoColor=white)](https://electronjs.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-v18%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -6,7 +7,7 @@
 [![SheetJS](https://img.shields.io/badge/SheetJS-0.18.5-217346?style=for-the-badge&logo=microsoft-excel&logoColor=white)](https://sheetjs.com/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg?style=for-the-badge)](https://opensource.org/licenses/ISC)
 
-**AutoMail Excel** is a sleek, cross-platform desktop application built with **Electron**, **Nodemailer**, and **SheetJS (XLSX)** that automates sending personalized bulk emails and attachments directly from your Excel (`.xlsx`, `.xls`) or CSV files.
+**AutoMail Pro** is a sleek, modern desktop application built with **Electron**, **Nodemailer**, and **SheetJS (XLSX)** that automates sending personalized bulk emails, CC/BCC recipients, and attachments directly from your Excel (`.xlsx`, `.xls`) or CSV files. Created by **Hitesh Bohra**.
 
 ---
 
