@@ -153,8 +153,30 @@
               </div>
 
               <div class="form-group">
-                <label for="mapAttachment">Attachment File Path Column <span style="font-weight: normal; color: var(--text-secondary);">(Optional)</span></label>
+                <label for="mapCc">CC Email Column <span style="font-weight: normal; color: var(--text-secondary);">(Optional)</span></label>
+                <select id="mapCc" class="select-highlight"></select>
+              </div>
+
+              <div class="form-group">
+                <label for="mapBcc">BCC Email Column <span style="font-weight: normal; color: var(--text-secondary);">(Optional)</span></label>
+                <select id="mapBcc" class="select-highlight"></select>
+              </div>
+
+              <div class="form-group">
+                <label for="mapAttachment">Attachment File Path Column <span style="font-weight: normal; color: var(--text-secondary);">(Optional - supports multi-file paths)</span></label>
                 <select id="mapAttachment" class="select-highlight"></select>
+              </div>
+
+              <!-- Master Global Attachment -->
+              <div class="form-group" style="margin-top: 4px; background: rgba(255, 255, 255, 0.03); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                <label style="margin-bottom: 6px; font-weight: 600; color: var(--text-primary);">Global Master Attachment <span style="font-weight: normal; color: var(--text-secondary);">(Attached to all emails)</span></label>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <button id="btnSelectGlobalAttach" type="button" class="btn btn-secondary btn-sm" style="font-size: 0.78rem; padding: 6px 12px;">
+                    📎 Choose File
+                  </button>
+                  <span id="globalAttachNameText" style="font-size: 0.78rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;">No global attachment set</span>
+                  <button id="btnRemoveGlobalAttach" type="button" class="btn-icon hidden" title="Clear global attachment" style="font-size: 14px; width: 22px; height: 22px;">&times;</button>
+                </div>
               </div>
 
               <div class="form-group checkbox-group" style="margin-top: 6px; background: rgba(59, 130, 246, 0.06); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(59, 130, 246, 0.15);">

@@ -149,15 +149,29 @@ ipcMain.handle('smtp:send-email', async (event, { smtpConfig, mailData }) => {
       to: mailData.to,
       subject: mailData.subject,
       text: mailData.body,
-      html: mailData.isHtml ? mailData.body : mailData.body.replace(/\n/g, '<br>')
+      html: mailData.isHtml ? mailData.body : (mailData.body || '').replace(/\n/g, '<br>')
     };
 
+    if (mailData.cc && String(mailData.cc).trim()) {
+      mailOptions.cc = String(mailData.cc).trim();
+    }
+
+    if (mailData.bcc && String(mailData.bcc).trim()) {
+      mailOptions.bcc = String(mailData.bcc).trim();
+    }
+
     if (mailData.attachmentPath && String(mailData.attachmentPath).trim()) {
-      const attachPath = String(mailData.attachmentPath).trim();
-      if (!fs.existsSync(attachPath)) {
-        throw new Error(`Attachment file not found: ${attachPath}`);
+      const rawPaths = String(mailData.attachmentPath).split(/[,;]+/).map(p => p.trim()).filter(Boolean);
+      const attachments = [];
+      for (const attachPath of rawPaths) {
+        if (!fs.existsSync(attachPath)) {
+          throw new Error(`Attachment file not found: ${attachPath}`);
+        }
+        attachments.push({ path: attachPath });
       }
-      mailOptions.attachments = [{ path: attachPath }];
+      if (attachments.length > 0) {
+        mailOptions.attachments = attachments;
+      }
     }
 
     const info = await transporter.sendMail(mailOptions);

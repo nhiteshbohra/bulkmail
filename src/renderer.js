@@ -48,9 +48,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const mappingSection = document.getElementById('mappingSection');
   const mapEmail = document.getElementById('mapEmail');
+  const mapCc = document.getElementById('mapCc');
+  const mapBcc = document.getElementById('mapBcc');
   const mapTopic = document.getElementById('mapTopic');
   const mapBody = document.getElementById('mapBody');
   const mapAttachment = document.getElementById('mapAttachment');
+  const btnSelectGlobalAttach = document.getElementById('btnSelectGlobalAttach');
+  const globalAttachNameText = document.getElementById('globalAttachNameText');
+  const btnRemoveGlobalAttach = document.getElementById('btnRemoveGlobalAttach');
   const splitMultipleEmails = document.getElementById('splitMultipleEmails');
 
   const emailDelay = document.getElementById('emailDelay');
@@ -243,8 +248,30 @@ document.addEventListener('DOMContentLoaded', () => {
     btnExportReport.disabled = true;
   }
 
+  // Global Attachment Listeners
+  if (btnSelectGlobalAttach) {
+    btnSelectGlobalAttach.addEventListener('click', async () => {
+      const selected = await window.electronAPI.selectFile();
+      if (selected) {
+        state.globalAttachmentPath = selected;
+        globalAttachNameText.textContent = selected.split(/[\\/]/).pop();
+        btnRemoveGlobalAttach.classList.remove('hidden');
+        onMappingChanged();
+      }
+    });
+  }
+
+  if (btnRemoveGlobalAttach) {
+    btnRemoveGlobalAttach.addEventListener('click', () => {
+      state.globalAttachmentPath = null;
+      globalAttachNameText.textContent = 'No global attachment set';
+      btnRemoveGlobalAttach.classList.add('hidden');
+      onMappingChanged();
+    });
+  }
+
   function populateMappingDropdowns(headers) {
-    const selectElements = [mapEmail, mapTopic, mapBody, mapAttachment].filter(Boolean);
+    const selectElements = [mapEmail, mapCc, mapBcc, mapTopic, mapBody, mapAttachment].filter(Boolean);
 
     selectElements.forEach(select => {
       select.innerHTML = '<option value="">-- Select Column --</option>';
@@ -262,6 +289,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!mapEmail.value && (lower.includes('email') || lower.includes('mail') || lower.includes('address'))) {
         mapEmail.value = h;
       }
+      if (mapCc && !mapCc.value && (lower === 'cc' || lower.includes('cc_email') || lower.includes('cc email'))) {
+        mapCc.value = h;
+      }
+      if (mapBcc && !mapBcc.value && (lower === 'bcc' || lower.includes('bcc_email') || lower.includes('bcc email'))) {
+        mapBcc.value = h;
+      }
       if (!mapTopic.value && (lower.includes('topic') || lower.includes('subject') || lower.includes('title'))) {
         mapTopic.value = h;
       }
@@ -275,6 +308,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add change listeners to rebuild log preview dynamically
     mapEmail.addEventListener('change', onMappingChanged);
+    if (mapCc) mapCc.addEventListener('change', onMappingChanged);
+    if (mapBcc) mapBcc.addEventListener('change', onMappingChanged);
     mapTopic.addEventListener('change', onMappingChanged);
     mapBody.addEventListener('change', onMappingChanged);
     if (mapAttachment) mapAttachment.addEventListener('change', onMappingChanged);
@@ -302,6 +337,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function buildCampaignLogs() {
     const emailCol = mapEmail.value;
+    const ccCol = mapCc ? mapCc.value : '';
+    const bccCol = mapBcc ? mapBcc.value : '';
     const topicCol = mapTopic.value;
     const bodyCol = mapBody.value;
     const attachmentCol = mapAttachment ? mapAttachment.value : '';
@@ -312,6 +349,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     state.rawRows.forEach((row, idx) => {
       let recipientRaw = emailCol ? String(row[emailCol] || '').trim() : '';
+      let ccRaw = ccCol ? String(row[ccCol] || '').trim() : '';
+      let bccRaw = bccCol ? String(row[bccCol] || '').trim() : '';
       let topicRaw = topicCol ? String(row[topicCol] || '') : '';
       let bodyRaw = bodyCol ? String(row[bodyCol] || '') : '';
       let attachmentRaw = attachmentCol ? String(row[attachmentCol] || '').trim() : '';
@@ -320,6 +359,15 @@ document.addEventListener('DOMContentLoaded', () => {
       let finalTopic = interpolateTemplate(topicRaw, row);
       let finalBody = interpolateTemplate(bodyRaw, row);
       let finalAttachment = interpolateTemplate(attachmentRaw, row);
+
+      // Combine row attachment(s) with global master attachment if set
+      let attachmentList = [];
+      if (finalAttachment) {
+        attachmentList.push(...finalAttachment.split(/[,;]+/).map(a => a.trim()).filter(Boolean));
+      }
+      if (state.globalAttachmentPath && !attachmentList.includes(state.globalAttachmentPath)) {
+        attachmentList.push(state.globalAttachmentPath);
+      }
 
       const parsedEmails = extractEmails(recipientRaw);
 
@@ -330,35 +378,26 @@ document.addEventListener('DOMContentLoaded', () => {
             id: currentId++,
             rowNumber: idx + 1,
             recipientEmail: singleEmail,
+            cc: ccRaw,
+            bcc: bccRaw,
             topic: finalTopic,
             body: finalBody,
-            attachmentPath: finalAttachment,
-            status: 'pending', // 'pending' | 'sending' | 'sent' | 'failed'
+            attachmentPath: attachmentList.join('; '),
+            status: 'pending',
             sentTime: '-',
             error: '-'
           });
-        });
-      } else if (parsedEmails.length > 1) {
-        // Keep as single row with comma-separated recipients
-        state.campaignLogs.push({
-          id: currentId++,
-          rowNumber: idx + 1,
-          recipientEmail: parsedEmails.join(', '),
-          topic: finalTopic,
-          body: finalBody,
-          attachmentPath: finalAttachment,
-          status: 'pending',
-          sentTime: '-',
-          error: '-'
         });
       } else {
         state.campaignLogs.push({
           id: currentId++,
           rowNumber: idx + 1,
-          recipientEmail: recipientRaw,
+          recipientEmail: parsedEmails.length > 1 ? parsedEmails.join(', ') : recipientRaw,
+          cc: ccRaw,
+          bcc: bccRaw,
           topic: finalTopic,
           body: finalBody,
-          attachmentPath: finalAttachment,
+          attachmentPath: attachmentList.join('; '),
           status: 'pending',
           sentTime: '-',
           error: '-'
@@ -574,6 +613,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // Dispatch Email via SMTP
       const mailData = {
         to: item.recipientEmail,
+        cc: item.cc || '',
+        bcc: item.bcc || '',
         subject: item.topic,
         body: item.body,
         attachmentPath: item.attachmentPath,
