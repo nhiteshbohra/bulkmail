@@ -418,10 +418,23 @@ document.addEventListener('DOMContentLoaded', () => {
         <td><strong>${escapeHtml(item.recipientEmail || '(Missing Email)')}</strong></td>
         <td>${escapeHtml(item.topic || '-')}</td>
         <td>${getStatusBadge(item.status)}</td>
-        <td style="font-size: 0.75rem; color: var(--text-secondary);">${item.sentTime}</td>
+        <td style="font-size: 0.75rem; color: var(--text-secondary);">${escapeHtml(item.sentTime || '-')}</td>
         <td>${item.error !== '-' ? `<span class="error-text">${escapeHtml(item.error)}</span>` : '-'}</td>
       </tr>
     `).join('');
+  }
+
+  function updateSingleRowUI(item) {
+    if (!item) return;
+    const rowEl = document.getElementById(`row-${item.id}`);
+    if (!rowEl) return;
+
+    const cells = rowEl.querySelectorAll('td');
+    if (cells.length >= 6) {
+      cells[3].innerHTML = getStatusBadge(item.status);
+      cells[4].textContent = item.sentTime || '-';
+      cells[5].innerHTML = item.error && item.error !== '-' ? `<span class="error-text">${escapeHtml(item.error)}</span>` : '-';
+    }
   }
 
   function getStatusBadge(status) {
@@ -443,7 +456,8 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   function updateMetrics() {

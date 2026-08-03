@@ -18,11 +18,15 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false
+      sandbox: true
     }
   });
 
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 
   // Remove default menu for a clean app feel
   mainWindow.setMenuBarVisibility(false);
