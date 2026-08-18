@@ -19,7 +19,7 @@ desktop.ini
 
 # Temporary Office / Excel Lock Files
 ~$*
-~$*.xlsx
+.xlsx
 
 # Python
 __pycache__/
