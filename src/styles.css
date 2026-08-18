@@ -745,3 +745,61 @@ tr:hover {
   50% { opacity: 1; }
   100% { opacity: 0.6; }
 }
+
+/* Global Attachments Multi-File Chips */
+.global-attach-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding-top: 2px;
+}
+
+.global-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  max-width: 100%;
+  transition: var(--transition-fast);
+}
+
+.global-attach-chip:hover {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.global-attach-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+.global-attach-chip-remove {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  transition: var(--transition-fast);
+}
+
+.global-attach-chip-remove:hover {
+  color: #fff;
+  background: rgba(239, 68, 68, 0.7);
+}

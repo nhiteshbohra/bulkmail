@@ -65,6 +65,25 @@ ipcMain.handle('dialog:select-file', async () => {
   return result.filePaths[0];
 });
 
+// IPC Handler: Open File Dialog for Attachments / Images with Multiple Selection Support
+ipcMain.handle('dialog:select-attachments', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Attachments (Images, Documents, Files)',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: 'Images & Documents', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp', 'pdf', 'docx', 'xlsx', 'csv', 'txt', 'zip'] },
+      { name: 'Images (*.png, *.jpg, *.jpeg, *.gif, *.webp, *.svg)', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'] },
+      { name: 'Documents (*.pdf, *.docx, *.txt, *.xlsx)', extensions: ['pdf', 'docx', 'txt', 'xlsx', 'csv', 'zip'] },
+      { name: 'All Files (*.*)', extensions: ['*'] }
+    ]
+  });
+
+  if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+    return [];
+  }
+  return result.filePaths;
+});
+
 // IPC Handler: Parse Excel/CSV File
 ipcMain.handle('excel:parse-file', async (event, filePath) => {
   try {

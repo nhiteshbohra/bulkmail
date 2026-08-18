@@ -16,7 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     smtpVerified: false,
     googleSignedIn: false,
     stopRequested: false,
-    pauseRequested: false
+    pauseRequested: false,
+    globalAttachmentPaths: []
   };
 
   // DOM Elements
@@ -54,8 +55,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const mapBody = document.getElementById('mapBody');
   const mapAttachment = document.getElementById('mapAttachment');
   const btnSelectGlobalAttach = document.getElementById('btnSelectGlobalAttach');
-  const globalAttachNameText = document.getElementById('globalAttachNameText');
-  const btnRemoveGlobalAttach = document.getElementById('btnRemoveGlobalAttach');
+  const globalAttachCountText = document.getElementById('globalAttachCountText');
+  const btnClearAllGlobalAttach = document.getElementById('btnClearAllGlobalAttach');
+  const globalAttachList = document.getElementById('globalAttachList');
   const splitMultipleEmails = document.getElementById('splitMultipleEmails');
 
   const emailDelay = document.getElementById('emailDelay');
@@ -248,25 +250,71 @@ document.addEventListener('DOMContentLoaded', () => {
     btnExportReport.disabled = true;
   }
 
-  // Global Attachment Listeners
+  // Global Attachment Listeners (Supports Multiple Images & Files)
   if (btnSelectGlobalAttach) {
     btnSelectGlobalAttach.addEventListener('click', async () => {
-      const selected = await window.electronAPI.selectFile();
-      if (selected) {
-        state.globalAttachmentPath = selected;
-        globalAttachNameText.textContent = selected.split(/[\\/]/).pop();
-        btnRemoveGlobalAttach.classList.remove('hidden');
+      const selected = await window.electronAPI.selectAttachments();
+      if (selected && selected.length > 0) {
+        if (!Array.isArray(state.globalAttachmentPaths)) {
+          state.globalAttachmentPaths = [];
+        }
+        selected.forEach(filePath => {
+          if (!state.globalAttachmentPaths.includes(filePath)) {
+            state.globalAttachmentPaths.push(filePath);
+          }
+        });
+        renderGlobalAttachmentsUI();
         onMappingChanged();
       }
     });
   }
 
-  if (btnRemoveGlobalAttach) {
-    btnRemoveGlobalAttach.addEventListener('click', () => {
-      state.globalAttachmentPath = null;
-      globalAttachNameText.textContent = 'No global attachment set';
-      btnRemoveGlobalAttach.classList.add('hidden');
+  if (btnClearAllGlobalAttach) {
+    btnClearAllGlobalAttach.addEventListener('click', () => {
+      state.globalAttachmentPaths = [];
+      renderGlobalAttachmentsUI();
       onMappingChanged();
+    });
+  }
+
+  function renderGlobalAttachmentsUI() {
+    if (!globalAttachList || !globalAttachCountText) return;
+
+    const count = (state.globalAttachmentPaths || []).length;
+    if (count === 0) {
+      globalAttachCountText.textContent = 'No global files selected';
+      globalAttachList.innerHTML = '';
+      if (btnClearAllGlobalAttach) btnClearAllGlobalAttach.classList.add('hidden');
+      return;
+    }
+
+    globalAttachCountText.textContent = `${count} file${count > 1 ? 's' : ''} selected`;
+    if (btnClearAllGlobalAttach) btnClearAllGlobalAttach.classList.remove('hidden');
+
+    globalAttachList.innerHTML = '';
+    state.globalAttachmentPaths.forEach((filePath, index) => {
+      const fileName = filePath.split(/[\\/]/).pop();
+      const ext = fileName.split('.').pop().toLowerCase();
+      const isImg = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp', 'ico'].includes(ext);
+      const icon = isImg ? '🖼️' : '📄';
+
+      const chip = document.createElement('div');
+      chip.className = 'global-attach-chip';
+      chip.title = filePath;
+      chip.innerHTML = `
+        <span>${icon}</span>
+        <span class="global-attach-chip-name">${escapeHtml(fileName)}</span>
+        <button type="button" class="global-attach-chip-remove" title="Remove ${escapeHtml(fileName)}">&times;</button>
+      `;
+
+      chip.querySelector('.global-attach-chip-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.globalAttachmentPaths.splice(index, 1);
+        renderGlobalAttachmentsUI();
+        onMappingChanged();
+      });
+
+      globalAttachList.appendChild(chip);
     });
   }
 
@@ -360,13 +408,17 @@ document.addEventListener('DOMContentLoaded', () => {
       let finalBody = interpolateTemplate(bodyRaw, row);
       let finalAttachment = interpolateTemplate(attachmentRaw, row);
 
-      // Combine row attachment(s) with global master attachment if set
+      // Combine row attachment(s) with global master attachments if set
       let attachmentList = [];
       if (finalAttachment) {
         attachmentList.push(...finalAttachment.split(/[,;]+/).map(a => a.trim()).filter(Boolean));
       }
-      if (state.globalAttachmentPath && !attachmentList.includes(state.globalAttachmentPath)) {
-        attachmentList.push(state.globalAttachmentPath);
+      if (Array.isArray(state.globalAttachmentPaths) && state.globalAttachmentPaths.length > 0) {
+        state.globalAttachmentPaths.forEach(gPath => {
+          if (gPath && !attachmentList.includes(gPath)) {
+            attachmentList.push(gPath);
+          }
+        });
       }
 
       const parsedEmails = extractEmails(recipientRaw);
@@ -740,6 +792,8 @@ document.addEventListener('DOMContentLoaded', () => {
     mapTopic.disabled = disabled;
     mapBody.disabled = disabled;
     if (mapAttachment) mapAttachment.disabled = disabled;
+    if (btnSelectGlobalAttach) btnSelectGlobalAttach.disabled = disabled;
+    if (btnClearAllGlobalAttach) btnClearAllGlobalAttach.disabled = disabled;
     emailDelay.disabled = disabled;
     if (btnTestSmtp) btnTestSmtp.disabled = disabled;
   }
