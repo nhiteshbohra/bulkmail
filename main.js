@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const fs = require('fs');
+const fs   = require('fs');
+const { exec } = require('child_process');
 const XLSX = require('xlsx');
 const nodemailer = require('nodemailer');
 
@@ -235,3 +236,149 @@ ipcMain.handle('excel:export-report', async (event, reportData) => {
     return { success: false, error: error.message };
   }
 });
+
+// ===========================================================================
+// IPC Handlers: Schedule Data (saved in project root for sender.js access)
+// ===========================================================================
+const SCHEDULE_FILE = path.join(__dirname, 'schedule_data.json');
+const SENDER_SCRIPT = path.join(__dirname, 'sender.js');
+const BAT_FILE      = path.join(__dirname, 'run_schedule.bat');
+const TASK_NAME     = 'AutoMailExcelSchedule';
+
+// Save schedule data to project root (where sender.js can find it)
+ipcMain.handle('schedule:save', async (event, scheduleData) => {
+  try {
+    fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(scheduleData, null, 2), 'utf8');
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('schedule:load', async () => {
+  try {
+    if (!fs.existsSync(SCHEDULE_FILE)) return { success: true, data: null };
+    const raw = fs.readFileSync(SCHEDULE_FILE, 'utf8');
+    return { success: true, data: JSON.parse(raw) };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('schedule:clear', async () => {
+  try {
+    if (fs.existsSync(SCHEDULE_FILE)) fs.unlinkSync(SCHEDULE_FILE);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// ===========================================================================
+// IPC Handler: Register a Windows Task Scheduler job
+// Finds node.exe, writes a .bat launcher, creates a schtasks entry
+// so emails send even if the app is completely closed.
+// ===========================================================================
+ipcMain.handle('schedule:create-os-task', async (event, { isoString }) => {
+  try {
+    // Find the node.exe path
+    const nodePath = await new Promise((resolve, reject) => {
+      exec('where node', (err, stdout) => {
+        if (err || !stdout.trim()) return reject(new Error('Node.js not found in PATH. Please ensure Node.js is installed.'));
+        resolve(stdout.trim().split('\r\n')[0].split('\n')[0].trim());
+      });
+    });
+
+    // Write a .bat launcher that sets the directory and invokes sender.js
+    const batContent = `@echo off\r\ncd /d "${__dirname}"\r\n"${nodePath}" "${SENDER_SCRIPT}"\r\n`;
+    fs.writeFileSync(BAT_FILE, batContent, 'utf8');
+
+    // Parse date/time for schtasks
+    const d   = new Date(isoString);
+    const mm  = String(d.getMonth() + 1).padStart(2, '0');
+    const dd  = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const hh  = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+
+    // Try dd/mm/yyyy first (standard on this system), fallback to mm/dd/yyyy if needed
+    let cmd = `schtasks /create /tn "${TASK_NAME}" /tr "\\"${BAT_FILE}\\"" /sc once /sd ${dd}/${mm}/${yyyy} /st ${hh}:${min} /f`;
+
+    try {
+      await new Promise((resolve, reject) => {
+        exec(cmd, (err, stdout, stderr) => {
+          if (err) return reject(new Error(stderr.trim() || err.message));
+          resolve(stdout);
+        });
+      });
+    } catch (firstErr) {
+      cmd = `schtasks /create /tn "${TASK_NAME}" /tr "\\"${BAT_FILE}\\"" /sc once /sd ${mm}/${dd}/${yyyy} /st ${hh}:${min} /f`;
+      await new Promise((resolve, reject) => {
+        exec(cmd, (err, stdout, stderr) => {
+          if (err) return reject(new Error(stderr.trim() || err.message || firstErr.message));
+          resolve(stdout);
+        });
+      });
+    }
+
+    return { success: true, nodePath, taskName: TASK_NAME };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// Delete the Windows Task Scheduler job and clean up files
+ipcMain.handle('schedule:delete-os-task', async () => {
+  const errors = [];
+  await new Promise(resolve => {
+    exec(`schtasks /delete /tn "${TASK_NAME}" /f`, (err, stdout, stderr) => {
+      if (err && !stderr.includes('cannot find')) errors.push(stderr.trim());
+      resolve();
+    });
+  });
+  try { if (fs.existsSync(SCHEDULE_FILE)) fs.unlinkSync(SCHEDULE_FILE); } catch(e) {}
+  try { if (fs.existsSync(BAT_FILE))      fs.unlinkSync(BAT_FILE); }      catch(e) {}
+  return errors.length === 0
+    ? { success: true }
+    : { success: false, error: errors.join('; ') };
+});
+
+// Check if a Windows task is currently registered
+ipcMain.handle('schedule:check-os-task', async () => {
+  try {
+    const output = await new Promise((resolve) => {
+      exec(`schtasks /query /tn "${TASK_NAME}" /fo LIST`, (err, stdout) => {
+        resolve(err ? '' : stdout);
+      });
+    });
+    return { exists: output.includes(TASK_NAME), raw: output };
+  } catch(e) {
+    return { exists: false };
+  }
+});
+
+// Get latest background campaign execution log (if sent while app was closed)
+ipcMain.handle('schedule:get-latest-log', async () => {
+  try {
+    const files = fs.readdirSync(__dirname)
+      .filter(f => f.startsWith('campaign_log_') && f.endsWith('.json'))
+      .map(f => ({ name: f, time: fs.statSync(path.join(__dirname, f)).mtimeMs }))
+      .sort((a, b) => b.time - a.time);
+
+    if (files.length === 0) return { success: true, log: null };
+
+    const latestPath = path.join(__dirname, files[0].name);
+    const content = JSON.parse(fs.readFileSync(latestPath, 'utf8'));
+    return {
+      success: true,
+      log: {
+        fileName: files[0].name,
+        timestamp: files[0].time,
+        data: content
+      }
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+

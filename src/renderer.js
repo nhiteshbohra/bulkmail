@@ -20,6 +20,10 @@ document.addEventListener('DOMContentLoaded', () => {
     globalAttachmentPaths: []
   };
 
+  // Schedule state (declared early so updateStartButtonState can reference it)
+  let scheduleTimeoutId = null;
+
+
   // DOM Elements
   const modeWebBtn = document.getElementById('modeWebBtn');
   const modeSmtpBtn = document.getElementById('modeSmtpBtn');
@@ -469,7 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function updateStartButtonState() {
+  function _coreUpdateStart() {
     const hasData = state.campaignLogs.length > 0;
     const hasEmailMap = mapEmail.value !== '';
     const hasTopicMap = mapTopic.value !== '';
@@ -477,6 +481,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasHost = smtpHost.value.trim() !== '';
 
     btnStart.disabled = !(hasData && hasEmailMap && hasTopicMap && hasBodyMap && hasHost && state.status === 'idle');
+  }
+
+  function updateStartButtonState() {
+    _coreUpdateStart();
+    // Sync schedule button enabled state
+    const sdEl = document.getElementById('scheduleDateTime');
+    const schBtn = document.getElementById('btnSchedule');
+    if (sdEl && schBtn && sdEl.value && !scheduleTimeoutId) {
+      const chosen = new Date(sdEl.value);
+      schBtn.disabled = (chosen <= new Date()) || (state.campaignLogs.length === 0);
+    }
   }
 
   // Render Log Table with Filtering & Search
@@ -841,4 +856,240 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ===========================================================================
+  // ===========================================================================
+  // Schedule Campaign Feature  (Persistent + Windows Background Task)
+  // ===========================================================================
+  const scheduleDateTime       = document.getElementById('scheduleDateTime');
+  const btnSchedule            = document.getElementById('btnSchedule');
+  const btnCancelSchedule      = document.getElementById('btnCancelSchedule');
+  const scheduleCountdownBox   = document.getElementById('scheduleCountdownBox');
+  const scheduleCountdownTimer = document.getElementById('scheduleCountdownTimer');
+  const scheduleTargetTime     = document.getElementById('scheduleTargetTime');
+  const scheduleBadge          = document.getElementById('scheduleBadge');
+  const scheduleCard           = document.getElementById('scheduleCard');
+
+  // scheduleTimeoutId declared at top of scope
+  let countdownIntervalId = null;
+
+  // ── helpers ────────────────────────────────────────────────────────────────
+
+  function refreshScheduleMin() {
+    const now = new Date(Date.now() + 60000);
+    const pad = n => String(n).padStart(2, '0');
+    scheduleDateTime.min =
+      `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+
+  function startCountdownUI(isoString) {
+    if (countdownIntervalId) clearInterval(countdownIntervalId);
+    function tick() {
+      const remaining = new Date(isoString) - new Date();
+      if (remaining <= 0) {
+        scheduleCountdownTimer.textContent = '00:00:00';
+        return;
+      }
+      const s = Math.floor(remaining / 1000);
+      scheduleCountdownTimer.textContent =
+        `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+    }
+    tick();
+    countdownIntervalId = setInterval(tick, 1000);
+  }
+
+  function applyScheduledUI(isoString) {
+    const d = new Date(isoString);
+    scheduleTargetTime.textContent = `Scheduled for: ${d.toLocaleString()}`;
+    scheduleCountdownBox.classList.remove('hidden');
+    scheduleBadge.classList.remove('hidden');
+    btnSchedule.classList.add('hidden');
+    btnCancelSchedule.classList.remove('hidden');
+    scheduleDateTime.disabled = true;
+    btnStart.disabled = true;
+    if (scheduleDateTime.value !== isoString.slice(0,16)) {
+      scheduleDateTime.value = isoString.slice(0,16);
+    }
+  }
+
+  function armScheduleTimeout(isoString, msUntil) {
+    if (scheduleTimeoutId) clearTimeout(scheduleTimeoutId);
+    scheduleTimeoutId = setTimeout(async () => {
+      clearInterval(countdownIntervalId);
+      countdownIntervalId = null;
+      scheduleTimeoutId   = null;
+      // Clean up schedule and OS task
+      await window.electronAPI.deleteOsTask();
+      await window.electronAPI.clearSchedule();
+      resetScheduleUI();
+      // In-app execution if app is currently open
+      startCampaign();
+    }, msUntil);
+  }
+
+  function resetScheduleUI() {
+    if (countdownIntervalId) { clearInterval(countdownIntervalId); countdownIntervalId = null; }
+    if (scheduleTimeoutId)   { clearTimeout(scheduleTimeoutId);   scheduleTimeoutId = null; }
+    scheduleCountdownBox.classList.add('hidden');
+    scheduleBadge.classList.add('hidden');
+    btnCancelSchedule.classList.add('hidden');
+    btnSchedule.classList.remove('hidden');
+    scheduleDateTime.disabled = false;
+    scheduleDateTime.value    = '';
+    btnSchedule.disabled      = true;
+    refreshScheduleMin();
+  }
+
+  // ── input change → enable button ───────────────────────────────────────────
+  if (scheduleDateTime) {
+    refreshScheduleMin();
+    scheduleDateTime.addEventListener('input', () => {
+      const val = scheduleDateTime.value;
+      btnSchedule.disabled = !val || (new Date(val) <= new Date()) || state.campaignLogs.length === 0;
+    });
+  }
+
+  // ── Schedule button ─────────────────────────────────────────────────────────
+  if (btnSchedule) {
+    btnSchedule.addEventListener('click', async () => {
+      const val = scheduleDateTime.value;
+      if (!val) { alert('Please pick a future date and time first.'); return; }
+      const targetDate = new Date(val);
+      const msUntil = targetDate - Date.now();
+      if (msUntil <= 0) { alert('Please choose a time in the future!'); return; }
+      if (state.campaignLogs.length === 0) { alert('Please load your Excel file and configure column mappings first.'); return; }
+
+      const smtpConfig = getSmtpConfig();
+      if (!smtpConfig.host || !smtpConfig.user || !smtpConfig.pass) {
+        alert('Please fill out your SMTP Server, User, and Password credentials first!');
+        return;
+      }
+
+      btnSchedule.disabled = true;
+
+      // 1. Build payload to persist: schedule time + campaign snapshot
+      const payload = {
+        isoString:    targetDate.toISOString(),
+        smtpConfig:   smtpConfig,
+        campaignLogs: JSON.parse(JSON.stringify(state.campaignLogs)),
+        emailDelay:   parseInt(emailDelay.value, 10) || 0,
+        savedAt:      new Date().toISOString()
+      };
+
+      await window.electronAPI.saveSchedule(payload);
+
+      // 2. Register Windows Task Scheduler background task
+      const osTaskRes = await window.electronAPI.createOsTask({ isoString: targetDate.toISOString() });
+
+      // 3. Setup in-app timer (if app stays open)
+      armScheduleTimeout(targetDate.toISOString(), msUntil);
+      startCountdownUI(targetDate.toISOString());
+      applyScheduledUI(targetDate.toISOString());
+
+      if (osTaskRes && osTaskRes.success) {
+        showScheduleToast(`⚡ Scheduled in Windows! Emails will send on ${targetDate.toLocaleString()} even if app is closed.`);
+      } else {
+        showScheduleToast(`Scheduled for ${targetDate.toLocaleString()} (In-app timer active).`);
+        if (osTaskRes && osTaskRes.error) {
+          console.warn('OS Task warning:', osTaskRes.error);
+        }
+      }
+    });
+  }
+
+  // ── Cancel button ────────────────────────────────────────────────────────────
+  if (btnCancelSchedule) {
+    btnCancelSchedule.addEventListener('click', async () => {
+      if (scheduleTimeoutId) { clearTimeout(scheduleTimeoutId); scheduleTimeoutId = null; }
+      await window.electronAPI.deleteOsTask();
+      await window.electronAPI.clearSchedule();
+      resetScheduleUI();
+      updateStartButtonState();
+      showScheduleToast('Schedule cancelled and Windows background task removed.');
+    });
+  }
+
+  // ── On startup: restore background logs or pending schedules ───────────────
+  (async () => {
+    // 1. Check if a background campaign completed while app was closed
+    const logResult = await window.electronAPI.getLatestLog();
+    if (logResult && logResult.success && logResult.log && Array.isArray(logResult.log.data)) {
+      const logData = logResult.log.data;
+      // If we don't have active files loaded, load the background results
+      if (state.campaignLogs.length === 0) {
+        state.campaignLogs = logData;
+        renderLogTable();
+        updateMetrics();
+
+        const sent = logData.filter(l => l.status === 'sent').length;
+        const failed = logData.filter(l => l.status === 'failed').length;
+
+        // Show a prominent success banner
+        const successBanner = document.createElement('div');
+        successBanner.className = 'missed-schedule-banner';
+        successBanner.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.1))';
+        successBanner.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        successBanner.style.color = '#34d399';
+        successBanner.innerHTML = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#10b981;">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          <span>
+            <strong>Background Campaign Completed!</strong> Your scheduled emails were sent automatically (${sent} sent, ${failed} failed). The activity log is displayed below.
+          </span>
+          <button class="missed-banner-close" title="Dismiss" style="color:#34d399;">✕</button>
+        `;
+        successBanner.querySelector('.missed-banner-close').addEventListener('click', () => {
+          successBanner.remove();
+        });
+        if (scheduleCard) scheduleCard.parentNode.insertBefore(successBanner, scheduleCard);
+      }
+    }
+
+    // 2. Check pending schedule
+    const result = await window.electronAPI.loadSchedule();
+    if (!result.success || !result.data) return;
+
+    const saved = result.data;
+    const targetDate = new Date(saved.isoString);
+    const msUntil    = targetDate - Date.now();
+
+    if (scheduleCard) {
+      scheduleCard.style.borderColor = 'rgba(139,92,246,0.4)';
+    }
+
+    if (msUntil <= 0) {
+      // Time passed
+      await window.electronAPI.deleteOsTask();
+      await window.electronAPI.clearSchedule();
+      return;
+    }
+
+    // Schedule is still in the future — restore it
+    if (saved.campaignLogs && saved.campaignLogs.length > 0 && state.campaignLogs.length === 0) {
+      state.campaignLogs = saved.campaignLogs;
+      renderLogTable();
+      updateMetrics();
+    }
+
+    armScheduleTimeout(saved.isoString, msUntil);
+    startCountdownUI(saved.isoString);
+    applyScheduledUI(saved.isoString);
+
+    showScheduleToast(`⚡ Scheduled in Windows Task Scheduler: Campaign fires at ${targetDate.toLocaleString()}`);
+  })();
+
+  function showScheduleToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'schedule-toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => { toast.classList.add('visible'); });
+    setTimeout(() => {
+      toast.classList.remove('visible');
+      setTimeout(() => toast.remove(), 400);
+    }, 5500);
+  }
+
 });
+
+
