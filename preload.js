@@ -16,6 +16,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteOsTask:  ()     => ipcRenderer.invoke('schedule:delete-os-task'),
   checkOsTask:   ()     => ipcRenderer.invoke('schedule:check-os-task'),
   getLatestLog:  ()     => ipcRenderer.invoke('schedule:get-latest-log'),
+  // Email verification & active domain checks
+  validateEmail:      (email, options) => ipcRenderer.invoke('email:validate', email, options),
+  validateEmailBatch: (emails, options) => ipcRenderer.invoke('email:validate-batch', emails, options),
+  // Signature file synchronization
+  loadSignatureFile:  () => ipcRenderer.invoke('signature:load'),
+  saveSignatureFile:  (sig) => ipcRenderer.invoke('signature:save', sig),
 });
 
 

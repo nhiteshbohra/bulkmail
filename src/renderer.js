@@ -40,9 +40,47 @@ document.addEventListener('DOMContentLoaded', () => {
   const smtpUser = document.getElementById('smtpUser');
   const smtpPass = document.getElementById('smtpPass');
   const smtpFromName = document.getElementById('smtpFromName');
+  const emailSignature = document.getElementById('emailSignature');
   const btnTestSmtp = document.getElementById('btnTestSmtp');
   const smtpFeedback = document.getElementById('smtpFeedback');
   const smtpStatusBadge = document.getElementById('smtpStatusBadge');
+
+  // Initialize Email Signature from localStorage or signature.txt file (account-aware)
+  function getSigStorageKey() {
+    const user = (smtpUser && smtpUser.value) ? smtpUser.value.trim().toLowerCase() : '';
+    return user ? `automail_sig_${user}` : 'automail_sig_default';
+  }
+
+  async function loadSignatureForCurrentAccount() {
+    if (!emailSignature) return;
+    const key = getSigStorageKey();
+    let saved = localStorage.getItem(key) || localStorage.getItem('automail_signature') || '';
+    if (!saved && window.electronAPI && window.electronAPI.loadSignatureFile) {
+      try {
+        const fileRes = await window.electronAPI.loadSignatureFile();
+        if (fileRes && fileRes.success && fileRes.signature) {
+          saved = fileRes.signature;
+        }
+      } catch (_) {}
+    }
+    emailSignature.value = saved;
+  }
+
+  if (emailSignature) {
+    loadSignatureForCurrentAccount();
+    emailSignature.addEventListener('input', () => {
+      localStorage.setItem(getSigStorageKey(), emailSignature.value);
+      localStorage.setItem('automail_signature', emailSignature.value);
+      if (window.electronAPI && window.electronAPI.saveSignatureFile) {
+        window.electronAPI.saveSignatureFile(emailSignature.value);
+      }
+    });
+  }
+
+  if (smtpUser) {
+    smtpUser.addEventListener('input', loadSignatureForCurrentAccount);
+    smtpUser.addEventListener('change', loadSignatureForCurrentAccount);
+  }
 
   const dropZone = document.getElementById('dropZone');
   const btnSelectFile = document.getElementById('btnSelectFile');
@@ -88,7 +126,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const filterCountAll = document.getElementById('filterCountAll');
   const filterCountSent = document.getElementById('filterCountSent');
   const filterCountFailed = document.getElementById('filterCountFailed');
+  const filterCountInvalid = document.getElementById('filterCountInvalid');
   const filterCountPending = document.getElementById('filterCountPending');
+
+  // Quota Shield & Email Verification Elements
+  const chkValidateEmails = document.getElementById('chkValidateEmails');
+  const btnValidateList = document.getElementById('btnValidateList');
+  const validationSummaryBanner = document.getElementById('validationSummaryBanner');
+  const valSummaryTitleText = document.getElementById('valSummaryTitleText');
+  const btnCloseValSummary = document.getElementById('btnCloseValSummary');
+  const valStatValid = document.getElementById('valStatValid');
+  const valStatInvalid = document.getElementById('valStatInvalid');
+  const btnFilterOutInvalid = document.getElementById('btnFilterOutInvalid');
+  const metricSaved = document.getElementById('metricSaved');
 
   // Initialize Preset Listener
   if (presetSelect) {
@@ -252,6 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateMetrics();
     updateStartButtonState();
     btnExportReport.disabled = true;
+    if (validationSummaryBanner) validationSummaryBanner.classList.add('hidden');
   }
 
   // Global Attachment Listeners (Supports Multiple Images & Files)
@@ -473,6 +524,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function formatEmailContent(bodyText, signatureText) {
+    let fullRaw = (bodyText || '').trim();
+    if (signatureText && signatureText.trim()) {
+      const sigTrimmed = signatureText.trim();
+      const sigFirstLine = sigTrimmed.split('\n')[0].replace(/^[-–—\s]+/, '').trim();
+      if (!sigFirstLine || !fullRaw.toLowerCase().includes(sigFirstLine.toLowerCase())) {
+        if (sigTrimmed.startsWith('--')) {
+          fullRaw += '\n\n' + sigTrimmed;
+        } else {
+          fullRaw += '\n\n--\n' + sigTrimmed;
+        }
+      }
+    }
+
+    const text = fullRaw;
+
+    // Escape HTML entities
+    let html = fullRaw
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Markdown links: [Title](https://...) or [Title](mailto:...)
+    html = html.replace(/\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^\s<)]+)\)/gi, '<a href="$2" style="color: #2563eb; text-decoration: underline;" target="_blank">$1</a>');
+
+    // Convert bare emails to mailto links: name@domain.com
+    html = html.replace(/(^|[\s>(])([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)/g, '$1<a href="mailto:$2" style="color: #2563eb; text-decoration: underline;">$2</a>');
+
+    // Convert bare URLs (not already inside href="...")
+    html = html.replace(/(^|[\s>(])(https?:\/\/[^\s<)]+)/g, (match, p1, p2) => {
+      return p1 + '<a href="' + p2 + '" style="color: #2563eb; text-decoration: underline;" target="_blank">' + p2 + '</a>';
+    });
+
+    // Convert newlines to HTML <br>
+    html = html.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+
+    return { text, html };
+  }
+
   function _coreUpdateStart() {
     const hasData = state.campaignLogs.length > 0;
     const hasEmailMap = mapEmail.value !== '';
@@ -481,6 +571,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasHost = smtpHost.value.trim() !== '';
 
     btnStart.disabled = !(hasData && hasEmailMap && hasTopicMap && hasBodyMap && hasHost && state.status === 'idle');
+    if (btnValidateList) {
+      btnValidateList.disabled = !(hasData && state.status === 'idle');
+    }
   }
 
   function updateStartButtonState() {
@@ -491,6 +584,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sdEl && schBtn && sdEl.value && !scheduleTimeoutId) {
       const chosen = new Date(sdEl.value);
       schBtn.disabled = (chosen <= new Date()) || (state.campaignLogs.length === 0);
+    }
+    if (typeof updateBatchPreview === 'function') {
+      updateBatchPreview();
     }
   }
 
@@ -549,6 +645,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return '<span class="badge badge-sent">✓ Sent</span>';
       case 'failed':
         return '<span class="badge badge-failed">✕ Failed</span>';
+      case 'invalid':
+        return '<span class="badge badge-invalid">⚠️ Inactive / Invalid</span>';
       case 'sending':
         return '<span class="badge badge-sending">⌛ Sending...</span>';
       default:
@@ -570,19 +668,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const total = state.campaignLogs.length;
     const sent = state.campaignLogs.filter(l => l.status === 'sent').length;
     const failed = state.campaignLogs.filter(l => l.status === 'failed').length;
+    const invalid = state.campaignLogs.filter(l => l.status === 'invalid').length;
     const pending = state.campaignLogs.filter(l => l.status === 'pending').length;
 
     metricTotal.textContent = total;
     metricSent.textContent = sent;
     metricFailed.textContent = failed;
+    if (metricSaved) metricSaved.textContent = invalid;
     metricPending.textContent = pending;
 
     filterCountAll.textContent = total;
     filterCountSent.textContent = sent;
     filterCountFailed.textContent = failed;
+    if (filterCountInvalid) filterCountInvalid.textContent = invalid;
     filterCountPending.textContent = pending;
 
-    const processed = sent + failed;
+    const processed = sent + failed + invalid;
     const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
 
     progressBarFill.style.width = `${percent}%`;
@@ -595,7 +696,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (state.status === 'stopped') {
       progressText.textContent = `Campaign Stopped (${processed} of ${total})`;
     } else if (processed === total && total > 0) {
-      progressText.textContent = `Campaign Complete! (${sent} Sent, ${failed} Failed)`;
+      const savedNotice = invalid > 0 ? ` (${invalid} Quota Saved)` : '';
+      progressText.textContent = `Campaign Complete! (${sent} Sent, ${failed} Failed${savedNotice})`;
     } else {
       progressText.textContent = 'Ready to start campaign';
     }
@@ -648,8 +750,8 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let i = 0; i < state.campaignLogs.length; i++) {
       const item = state.campaignLogs[i];
 
-      // Skip already sent rows if re-starting
-      if (item.status === 'sent') continue;
+      // Skip already sent or invalid rows if re-starting
+      if (item.status === 'sent' || item.status === 'invalid') continue;
 
       // Handle Pause Request
       while (state.pauseRequested) {
@@ -662,8 +764,19 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
       }
 
-      // Skip invalid emails
-      if (!item.recipientEmail || !item.recipientEmail.includes('@')) {
+      // Pre-send validation to protect daily sending quota
+      const shouldValidate = chkValidateEmails ? chkValidateEmails.checked : true;
+      if (shouldValidate) {
+        const validation = await window.electronAPI.validateEmail(item.recipientEmail);
+        if (!validation.isValid || !validation.isActive) {
+          item.status = 'invalid';
+          item.error = `Skipped (Quota saved): ${validation.reason}`;
+          item.sentTime = new Date().toLocaleTimeString();
+          updateSingleRowUI(item);
+          updateMetrics();
+          continue; // Directly skip sending email, protecting daily quota!
+        }
+      } else if (!item.recipientEmail || !item.recipientEmail.includes('@')) {
         item.status = 'failed';
         item.error = 'Invalid email address format';
         item.sentTime = new Date().toLocaleTimeString();
@@ -677,15 +790,20 @@ document.addEventListener('DOMContentLoaded', () => {
       updateSingleRowUI(item);
       updateMetrics();
 
+      // Format email body and signature with clickable HTML links
+      const signatureStr = emailSignature ? emailSignature.value : '';
+      const formatted = formatEmailContent(item.body, signatureStr);
+
       // Dispatch Email via SMTP
       const mailData = {
         to: item.recipientEmail,
         cc: item.cc || '',
         bcc: item.bcc || '',
         subject: item.topic,
-        body: item.body,
+        text: formatted.text,
+        html: formatted.html,
         attachmentPath: item.attachmentPath,
-        isHtml: false
+        isHtml: true
       };
 
       const res = await window.electronAPI.sendEmail(smtpConfig, mailData);
@@ -809,8 +927,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (mapAttachment) mapAttachment.disabled = disabled;
     if (btnSelectGlobalAttach) btnSelectGlobalAttach.disabled = disabled;
     if (btnClearAllGlobalAttach) btnClearAllGlobalAttach.disabled = disabled;
-    emailDelay.disabled = disabled;
+    if (emailDelay) emailDelay.disabled = disabled;
+    if (emailSignature) emailSignature.disabled = disabled;
     if (btnTestSmtp) btnTestSmtp.disabled = disabled;
+    if (btnValidateList) btnValidateList.disabled = disabled;
+    if (chkValidateEmails) chkValidateEmails.disabled = disabled;
   }
 
   function sleep(ms) {
@@ -856,23 +977,247 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // List Verification Feature (Pre-flight Scanner)
+  if (btnValidateList) {
+    btnValidateList.addEventListener('click', async () => {
+      if (state.campaignLogs.length === 0 || state.status !== 'idle') return;
+
+      btnValidateList.disabled = true;
+      const originalHtml = btnValidateList.innerHTML;
+      btnValidateList.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg> Verifying...`;
+
+      try {
+        const res = await window.electronAPI.validateEmailBatch(state.campaignLogs);
+        if (res.success && Array.isArray(res.results)) {
+          let invalidCount = 0;
+          res.results.forEach(r => {
+            const item = state.campaignLogs[r.index];
+            if (item) {
+              if (!r.isValid || !r.isActive) {
+                item.status = 'invalid';
+                item.error = `Skipped (Quota saved): ${r.reason}`;
+                invalidCount++;
+              } else if (item.status === 'invalid') {
+                item.status = 'pending';
+                item.error = '-';
+              }
+            }
+          });
+
+          renderLogTable();
+          updateMetrics();
+          updateStartButtonState();
+
+          if (validationSummaryBanner) {
+            valStatValid.textContent = `${res.validCount} Active & Valid`;
+            valStatInvalid.textContent = `${invalidCount} Inactive/Invalid`;
+            validationSummaryBanner.classList.remove('hidden');
+          }
+        } else {
+          alert('Email verification failed: ' + (res.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Verification error: ' + err.message);
+      } finally {
+        btnValidateList.disabled = false;
+        btnValidateList.innerHTML = originalHtml;
+      }
+    });
+  }
+
+  if (btnCloseValSummary) {
+    btnCloseValSummary.addEventListener('click', () => {
+      if (validationSummaryBanner) validationSummaryBanner.classList.add('hidden');
+    });
+  }
+
+  if (btnFilterOutInvalid) {
+    btnFilterOutInvalid.addEventListener('click', () => {
+      const beforeCount = state.campaignLogs.length;
+      state.campaignLogs = state.campaignLogs.filter(l => l.status !== 'invalid');
+      const removedCount = beforeCount - state.campaignLogs.length;
+
+      // Re-index remaining rows
+      state.campaignLogs.forEach((item, i) => {
+        item.id = i + 1;
+      });
+
+      renderLogTable();
+      updateMetrics();
+      updateStartButtonState();
+
+      if (validationSummaryBanner) validationSummaryBanner.classList.add('hidden');
+      alert(`Removed ${removedCount} invalid/inactive recipient(s) from campaign. ${state.campaignLogs.length} active recipients ready!`);
+    });
+  }
+
   // ===========================================================================
   // ===========================================================================
-  // Schedule Campaign Feature  (Persistent + Windows Background Task)
+  // Schedule Campaign Feature (Multi-Day Batch Support + Windows Task Scheduler)
   // ===========================================================================
-  const scheduleDateTime       = document.getElementById('scheduleDateTime');
-  const btnSchedule            = document.getElementById('btnSchedule');
-  const btnCancelSchedule      = document.getElementById('btnCancelSchedule');
-  const scheduleCountdownBox   = document.getElementById('scheduleCountdownBox');
-  const scheduleCountdownTimer = document.getElementById('scheduleCountdownTimer');
-  const scheduleTargetTime     = document.getElementById('scheduleTargetTime');
-  const scheduleBadge          = document.getElementById('scheduleBadge');
-  const scheduleCard           = document.getElementById('scheduleCard');
+  const scheduleDateTime        = document.getElementById('scheduleDateTime');
+  const btnSchedule             = document.getElementById('btnSchedule');
+  const btnCancelSchedule       = document.getElementById('btnCancelSchedule');
+  const scheduleCountdownBox    = document.getElementById('scheduleCountdownBox');
+  const scheduleCountdownLabel  = document.getElementById('scheduleCountdownLabel');
+  const scheduleCountdownTimer  = document.getElementById('scheduleCountdownTimer');
+  const scheduleTargetTime      = document.getElementById('scheduleTargetTime');
+  const scheduleBadge           = document.getElementById('scheduleBadge');
+  const scheduleCard            = document.getElementById('scheduleCard');
+
+  // Batch Configuration Elements
+  const chkDailyBatches         = document.getElementById('chkDailyBatches');
+  const inputDailyLimit         = document.getElementById('inputDailyLimit');
+  const chkWeekdaysOnly         = document.getElementById('chkWeekdaysOnly');
+  const batchOptionsSubRow      = document.getElementById('batchOptionsSubRow');
+  const batchPreviewBox         = document.getElementById('batchPreviewBox');
+  const batchPreviewTitle       = document.getElementById('batchPreviewTitle');
+  const batchPreviewList        = document.getElementById('batchPreviewList');
+  const activeBatchProgressBox  = document.getElementById('activeBatchProgressBox');
+  const activeBatchProgressBadge= document.getElementById('activeBatchProgressBadge');
+  const activeBatchTimeline     = document.getElementById('activeBatchTimeline');
 
   // scheduleTimeoutId declared at top of scope
   let countdownIntervalId = null;
 
   // ── helpers ────────────────────────────────────────────────────────────────
+
+  function addWeekdays(startDate, numDays, weekdaysOnly = true) {
+    let cur = new Date(startDate);
+    let added = 0;
+    while (added < numDays) {
+      cur.setDate(cur.getDate() + 1);
+      const day = cur.getDay(); // 0: Sun, 6: Sat
+      if (!weekdaysOnly || (day !== 0 && day !== 6)) {
+        added++;
+      }
+    }
+    return cur;
+  }
+
+  function generateBatches(startDate, logs, dailyLimit, weekdaysOnly) {
+    // Only schedule active/deliverable emails (exclude invalid addresses to protect quota)
+    const activeLogs = logs.filter(l => l.status !== 'invalid');
+    const total = activeLogs.length;
+    const numBatches = Math.ceil(total / dailyLimit) || 1;
+    const batches = [];
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    for (let i = 0; i < numBatches; i++) {
+      const startIdx = i * dailyLimit;
+      const endIdx = Math.min(startIdx + dailyLimit, total);
+      const items = activeLogs.slice(startIdx, endIdx);
+      if (items.length === 0 && i > 0) continue;
+      const batchDate = addWeekdays(startDate, i, weekdaysOnly);
+      const dayLabel = `${dayNames[batchDate.getDay()]}, ${monthNames[batchDate.getMonth()]} ${batchDate.getDate()}`;
+
+      batches.push({
+        batchNumber: i + 1,
+        dayLabel: dayLabel,
+        isoString: batchDate.toISOString(),
+        status: 'pending',
+        sentAt: null,
+        sentCount: 0,
+        failCount: 0,
+        items: items
+      });
+    }
+    return batches;
+  }
+
+  function updateBatchPreview() {
+    if (!batchPreviewBox || !chkDailyBatches) return;
+
+    if (!chkDailyBatches.checked) {
+      batchPreviewBox.classList.add('hidden');
+      if (batchOptionsSubRow) batchOptionsSubRow.style.opacity = '0.4';
+      return;
+    }
+
+    if (batchOptionsSubRow) batchOptionsSubRow.style.opacity = '1';
+
+    const val = scheduleDateTime.value;
+    const total = state.campaignLogs.filter(l => l.status !== 'invalid').length;
+    const limit = parseInt(inputDailyLimit.value, 10) || 500;
+    const weekdays = chkWeekdaysOnly.checked;
+
+    if (!val || total <= 0) {
+      batchPreviewBox.classList.add('hidden');
+      return;
+    }
+
+    const startDate = new Date(val);
+    const batches = generateBatches(startDate, state.campaignLogs, limit, weekdays);
+
+    if (batches.length <= 1) {
+      batchPreviewBox.classList.add('hidden');
+      return;
+    }
+
+    batchPreviewBox.classList.remove('hidden');
+    batchPreviewTitle.textContent = `${total.toLocaleString()} active emails split across ${batches.length} daily batches (${limit}/day)`;
+
+    batchPreviewList.innerHTML = '';
+    batches.forEach(b => {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'batch-preview-item';
+      const timeStr = new Date(b.isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      itemEl.innerHTML = `
+        <div>
+          <span class="batch-num">Day ${b.batchNumber}:</span>
+          <span class="batch-day">${b.dayLabel} at ${timeStr}</span>
+        </div>
+        <span class="batch-cnt">${b.items.length} emails</span>
+      `;
+      batchPreviewList.appendChild(itemEl);
+    });
+  }
+
+  function renderActiveBatchTimeline(batches) {
+    if (!activeBatchTimeline || !batches || batches.length === 0) return;
+
+    activeBatchProgressBox.classList.remove('hidden');
+    const completedCount = batches.filter(b => b.status === 'completed').length;
+    activeBatchProgressBadge.textContent = `${completedCount} of ${batches.length} Batches Completed`;
+
+    activeBatchTimeline.innerHTML = '';
+    let foundNext = false;
+
+    batches.forEach(b => {
+      const row = document.createElement('div');
+      row.className = 'active-batch-row';
+      const timeStr = new Date(b.isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      let tagClass = 'pending';
+      let tagText = 'Scheduled';
+
+      if (b.status === 'completed') {
+        row.classList.add('completed');
+        tagClass = 'completed';
+        tagText = `Sent (${b.sentCount || b.items.length})`;
+      } else if (!foundNext) {
+        foundNext = true;
+        row.classList.add('current');
+        tagClass = 'next';
+        tagText = 'Next Up';
+      }
+
+      row.innerHTML = `
+        <div class="active-batch-left">
+          <div class="active-batch-indicator"></div>
+          <div>
+            <div class="active-batch-name">Batch #${b.batchNumber} — ${b.dayLabel}</div>
+            <div class="active-batch-subtext">${timeStr} • ${b.items.length} recipients</div>
+          </div>
+        </div>
+        <div class="active-batch-right">
+          <span class="batch-tag ${tagClass}">${tagText}</span>
+        </div>
+      `;
+      activeBatchTimeline.appendChild(row);
+    });
+  }
 
   function refreshScheduleMin() {
     const now = new Date(Date.now() + 60000);
@@ -897,15 +1242,37 @@ document.addEventListener('DOMContentLoaded', () => {
     countdownIntervalId = setInterval(tick, 1000);
   }
 
-  function applyScheduledUI(isoString) {
+  function applyScheduledUI(isoString, savedData) {
     const d = new Date(isoString);
-    scheduleTargetTime.textContent = `Scheduled for: ${d.toLocaleString()}`;
     scheduleCountdownBox.classList.remove('hidden');
     scheduleBadge.classList.remove('hidden');
     btnSchedule.classList.add('hidden');
     btnCancelSchedule.classList.remove('hidden');
     scheduleDateTime.disabled = true;
+    if (chkDailyBatches) chkDailyBatches.disabled = true;
+    if (inputDailyLimit) inputDailyLimit.disabled = true;
+    if (chkWeekdaysOnly) chkWeekdaysOnly.disabled = true;
     btnStart.disabled = true;
+
+    if (batchPreviewBox) batchPreviewBox.classList.add('hidden');
+
+    if (savedData && Array.isArray(savedData.batches) && savedData.batches.length > 0) {
+      const pendingBatch = savedData.batches.find(b => b.status === 'pending');
+      if (pendingBatch) {
+        scheduleCountdownLabel.textContent = `Batch #${pendingBatch.batchNumber} of ${savedData.batches.length} fires in`;
+        scheduleTargetTime.textContent = `Next Run: ${pendingBatch.dayLabel} at ${new Date(pendingBatch.isoString).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+        scheduleBadge.textContent = `Batch ${pendingBatch.batchNumber}/${savedData.batches.length} Active`;
+      } else {
+        scheduleCountdownLabel.textContent = `All ${savedData.batches.length} batches complete!`;
+        scheduleBadge.textContent = `Campaign Completed`;
+      }
+      renderActiveBatchTimeline(savedData.batches);
+    } else {
+      scheduleTargetTime.textContent = `Scheduled for: ${d.toLocaleString()}`;
+      scheduleBadge.textContent = `Scheduled`;
+      if (activeBatchProgressBox) activeBatchProgressBox.classList.add('hidden');
+    }
+
     if (scheduleDateTime.value !== isoString.slice(0,16)) {
       scheduleDateTime.value = isoString.slice(0,16);
     }
@@ -917,12 +1284,24 @@ document.addEventListener('DOMContentLoaded', () => {
       clearInterval(countdownIntervalId);
       countdownIntervalId = null;
       scheduleTimeoutId   = null;
-      // Clean up schedule and OS task
-      await window.electronAPI.deleteOsTask();
-      await window.electronAPI.clearSchedule();
-      resetScheduleUI();
-      // In-app execution if app is currently open
-      startCampaign();
+
+      // Allow background sender to execute and check updated schedule
+      setTimeout(async () => {
+        const res = await window.electronAPI.loadSchedule();
+        if (res.success && res.data) {
+          const nextPending = res.data.batches && res.data.batches.find(b => b.status === 'pending');
+          if (nextPending) {
+            const nextMs = new Date(nextPending.isoString) - Date.now();
+            if (nextMs > 0) {
+              armScheduleTimeout(nextPending.isoString, nextMs);
+              startCountdownUI(nextPending.isoString);
+              applyScheduledUI(nextPending.isoString, res.data);
+              return;
+            }
+          }
+        }
+        resetScheduleUI();
+      }, 5000);
     }, msUntil);
   }
 
@@ -934,18 +1313,34 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCancelSchedule.classList.add('hidden');
     btnSchedule.classList.remove('hidden');
     scheduleDateTime.disabled = false;
+    if (chkDailyBatches) chkDailyBatches.disabled = false;
+    if (inputDailyLimit) inputDailyLimit.disabled = false;
+    if (chkWeekdaysOnly) chkWeekdaysOnly.disabled = false;
+    if (activeBatchProgressBox) activeBatchProgressBox.classList.add('hidden');
     scheduleDateTime.value    = '';
     btnSchedule.disabled      = true;
     refreshScheduleMin();
+    updateBatchPreview();
   }
 
-  // ── input change → enable button ───────────────────────────────────────────
+  // ── Input & Batch change listeners ─────────────────────────────────────────
   if (scheduleDateTime) {
     refreshScheduleMin();
     scheduleDateTime.addEventListener('input', () => {
       const val = scheduleDateTime.value;
       btnSchedule.disabled = !val || (new Date(val) <= new Date()) || state.campaignLogs.length === 0;
+      updateBatchPreview();
     });
+  }
+
+  if (chkDailyBatches) {
+    chkDailyBatches.addEventListener('change', updateBatchPreview);
+  }
+  if (inputDailyLimit) {
+    inputDailyLimit.addEventListener('input', updateBatchPreview);
+  }
+  if (chkWeekdaysOnly) {
+    chkWeekdaysOnly.addEventListener('change', updateBatchPreview);
   }
 
   // ── Schedule button ─────────────────────────────────────────────────────────
@@ -966,32 +1361,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
       btnSchedule.disabled = true;
 
-      // 1. Build payload to persist: schedule time + campaign snapshot
+      const dailyLimit = parseInt(inputDailyLimit.value, 10) || 500;
+      const weekdays = chkWeekdaysOnly.checked;
+      const useBatches = chkDailyBatches.checked && state.campaignLogs.length > dailyLimit;
+
+      let batches = null;
+      let firstIso = targetDate.toISOString();
+
+      if (useBatches) {
+        batches = generateBatches(targetDate, state.campaignLogs, dailyLimit, weekdays);
+        firstIso = batches[0].isoString;
+      }
+
+      // 1. Build payload to persist
       const payload = {
-        isoString:    targetDate.toISOString(),
+        isoString:    firstIso,
         smtpConfig:   smtpConfig,
         campaignLogs: JSON.parse(JSON.stringify(state.campaignLogs)),
         emailDelay:   parseInt(emailDelay.value, 10) || 0,
-        savedAt:      new Date().toISOString()
+        dailyLimit:   dailyLimit,
+        weekdaysOnly: weekdays,
+        signature:    emailSignature ? emailSignature.value : '',
+        savedAt:      new Date().toISOString(),
+        batches:      batches
       };
 
       await window.electronAPI.saveSchedule(payload);
 
-      // 2. Register Windows Task Scheduler background task
-      const osTaskRes = await window.electronAPI.createOsTask({ isoString: targetDate.toISOString() });
+      // 2. Register Windows Task Scheduler background task for the first batch
+      const osTaskRes = await window.electronAPI.createOsTask({ isoString: firstIso });
 
       // 3. Setup in-app timer (if app stays open)
-      armScheduleTimeout(targetDate.toISOString(), msUntil);
-      startCountdownUI(targetDate.toISOString());
-      applyScheduledUI(targetDate.toISOString());
+      armScheduleTimeout(firstIso, msUntil);
+      startCountdownUI(firstIso);
+      applyScheduledUI(firstIso, payload);
 
-      if (osTaskRes && osTaskRes.success) {
+      if (useBatches) {
+        showScheduleToast(`⚡ Multi-day campaign scheduled! ${batches.length} batches created (${dailyLimit}/day max). Batch #1 set for ${targetDate.toLocaleString()}.`);
+      } else if (osTaskRes && osTaskRes.success) {
         showScheduleToast(`⚡ Scheduled in Windows! Emails will send on ${targetDate.toLocaleString()} even if app is closed.`);
       } else {
         showScheduleToast(`Scheduled for ${targetDate.toLocaleString()} (In-app timer active).`);
-        if (osTaskRes && osTaskRes.error) {
-          console.warn('OS Task warning:', osTaskRes.error);
-        }
       }
     });
   }
@@ -1014,7 +1424,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const logResult = await window.electronAPI.getLatestLog();
     if (logResult && logResult.success && logResult.log && Array.isArray(logResult.log.data)) {
       const logData = logResult.log.data;
-      // If we don't have active files loaded, load the background results
       if (state.campaignLogs.length === 0) {
         state.campaignLogs = logData;
         renderLogTable();
@@ -1023,7 +1432,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const sent = logData.filter(l => l.status === 'sent').length;
         const failed = logData.filter(l => l.status === 'failed').length;
 
-        // Show a prominent success banner
         const successBanner = document.createElement('div');
         successBanner.className = 'missed-schedule-banner';
         successBanner.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.1))';
@@ -1034,7 +1442,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
           </svg>
           <span>
-            <strong>Background Campaign Completed!</strong> Your scheduled emails were sent automatically (${sent} sent, ${failed} failed). The activity log is displayed below.
+            <strong>Background Campaign Log Loaded:</strong> Activity results displayed (${sent} sent, ${failed} failed).
           </span>
           <button class="missed-banner-close" title="Dismiss" style="color:#34d399;">✕</button>
         `;
@@ -1050,21 +1458,46 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!result.success || !result.data) return;
 
     const saved = result.data;
-    const targetDate = new Date(saved.isoString);
-    const msUntil    = targetDate - Date.now();
-
     if (scheduleCard) {
       scheduleCard.style.borderColor = 'rgba(139,92,246,0.4)';
     }
 
+    // Check if multi-batch
+    if (Array.isArray(saved.batches) && saved.batches.length > 0) {
+      if (saved.campaignLogs && saved.campaignLogs.length > 0 && state.campaignLogs.length === 0) {
+        state.campaignLogs = saved.campaignLogs;
+        renderLogTable();
+        updateMetrics();
+      }
+
+      const nextPending = saved.batches.find(b => b.status === 'pending');
+      if (nextPending) {
+        const targetDate = new Date(nextPending.isoString);
+        const msUntil = targetDate - Date.now();
+
+        armScheduleTimeout(nextPending.isoString, Math.max(0, msUntil));
+        startCountdownUI(nextPending.isoString);
+        applyScheduledUI(nextPending.isoString, saved);
+
+        showScheduleToast(`⚡ Multi-day schedule active: Batch #${nextPending.batchNumber} (${nextPending.dayLabel}) fires next.`);
+      } else {
+        // All batches completed
+        await window.electronAPI.deleteOsTask();
+        await window.electronAPI.clearSchedule();
+      }
+      return;
+    }
+
+    // Legacy single schedule
+    const targetDate = new Date(saved.isoString);
+    const msUntil    = targetDate - Date.now();
+
     if (msUntil <= 0) {
-      // Time passed
       await window.electronAPI.deleteOsTask();
       await window.electronAPI.clearSchedule();
       return;
     }
 
-    // Schedule is still in the future — restore it
     if (saved.campaignLogs && saved.campaignLogs.length > 0 && state.campaignLogs.length === 0) {
       state.campaignLogs = saved.campaignLogs;
       renderLogTable();
@@ -1073,7 +1506,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     armScheduleTimeout(saved.isoString, msUntil);
     startCountdownUI(saved.isoString);
-    applyScheduledUI(saved.isoString);
+    applyScheduledUI(saved.isoString, saved);
 
     showScheduleToast(`⚡ Scheduled in Windows Task Scheduler: Campaign fires at ${targetDate.toLocaleString()}`);
   })();
@@ -1089,7 +1522,6 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => toast.remove(), 400);
     }, 5500);
   }
-
 });
 
 

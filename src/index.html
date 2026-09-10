@@ -91,6 +91,15 @@
                   <label for="smtpFromName">Display Name (From Name)</label>
                   <input type="text" id="smtpFromName" placeholder="John Doe Marketing">
                 </div>
+
+                <div class="form-group col-12">
+                  <label for="emailSignature" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Email Signature <span style="font-weight: normal; color: var(--text-secondary);">(Appended to all emails)</span></span>
+                    <span style="font-size: 0.72rem; color: #34d399; font-weight: normal;">✓ Clickable Links Supported</span>
+                  </label>
+                  <textarea id="emailSignature" rows="4" style="width: 100%; font-family: inherit; font-size: 0.8rem; background: rgba(0,0,0,0.25); border: 1px solid var(--border-card); border-radius: var(--radius-sm); color: var(--text-primary); padding: 8px 10px; resize: vertical;" placeholder="--&#10;Best regards,&#10;Your Name&#10;+91 9876543210&#10;[LinkedIn](http://linkedin.com/in/yourprofile) | [GitHub](http://github.com/yourprofile)"></textarea>
+                  <span class="input-hint">Markdown links like <code>[LinkedIn](http://...)</code>, emails, and phone numbers are automatically converted into clickable links.</span>
+                </div>
               </div>
 
               <div class="card-footer">
@@ -252,6 +261,43 @@
               </button>
             </div>
 
+            <!-- Pre-flight Validation & Safeguards -->
+            <div class="validation-toolbar">
+              <label class="checkbox-container quota-guard-toggle" title="Skip invalid addresses and non-existent domains automatically to protect daily sending limit">
+                <input type="checkbox" id="chkValidateEmails" checked>
+                <span class="custom-checkbox"></span>
+                <span class="checkbox-text">
+                  <strong>Shield Quota:</strong> Skip inactive & invalid emails
+                  <span class="quota-badge">Saves Quota</span>
+                </span>
+              </label>
+
+              <button id="btnValidateList" type="button" class="btn btn-secondary btn-sm" title="Scan all loaded recipient emails for dead domains, typos, and bad syntax before starting" disabled>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Verify List
+              </button>
+            </div>
+
+            <!-- Validation Summary Banner (shows results when user clicks Verify List) -->
+            <div id="validationSummaryBanner" class="validation-summary-box hidden">
+              <div class="val-summary-header">
+                <div class="val-summary-title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <span id="valSummaryTitleText">List Verification Summary</span>
+                </div>
+                <button id="btnCloseValSummary" type="button" class="btn-icon" title="Dismiss">&times;</button>
+              </div>
+              <div class="val-summary-stats">
+                <span class="val-stat valid" id="valStatValid">0 Active</span>
+                <span class="val-stat invalid" id="valStatInvalid">0 Inactive/Invalid</span>
+              </div>
+              <div class="val-summary-actions">
+                <button id="btnFilterOutInvalid" type="button" class="btn btn-outline btn-sm">
+                  Filter Out Inactive Emails
+                </button>
+              </div>
+            </div>
+
             <!-- Metrics Counters -->
             <div class="metrics-grid">
               <div class="metric-card total">
@@ -265,6 +311,10 @@
               <div class="metric-card failed">
                 <div class="metric-value" id="metricFailed">0</div>
                 <div class="metric-label">Failed</div>
+              </div>
+              <div class="metric-card saved">
+                <div class="metric-value" id="metricSaved">0</div>
+                <div class="metric-label">Quota Saved</div>
               </div>
               <div class="metric-card pending">
                 <div class="metric-value" id="metricPending">0</div>
@@ -301,20 +351,65 @@
                 </div>
               </div>
 
+              <!-- Batch Configuration Section -->
+              <div id="batchConfigSection" class="batch-config-section">
+                <div class="batch-toggle-row">
+                  <label class="checkbox-container">
+                    <input type="checkbox" id="chkDailyBatches" checked>
+                    <span class="custom-checkbox"></span>
+                    <span class="checkbox-text"><strong>Split into Safe Daily Batches</strong> (Avoid Gmail 500 emails/day quota limit)</span>
+                  </label>
+                </div>
+
+                <div id="batchOptionsSubRow" class="batch-options-subrow">
+                  <div class="batch-limit-group">
+                    <label for="inputDailyLimit">Max Per Day:</label>
+                    <input type="number" id="inputDailyLimit" class="batch-limit-input" value="500" min="50" max="2000" step="50">
+                    <span class="batch-hint-badge">Gmail Safe: ≤500</span>
+                  </div>
+                  <label class="checkbox-container">
+                    <input type="checkbox" id="chkWeekdaysOnly" checked>
+                    <span class="custom-checkbox"></span>
+                    <span class="checkbox-text">Weekdays Only (Mon – Fri, skip weekends)</span>
+                  </label>
+                </div>
+
+                <!-- Batch Preview Box (shown before scheduling) -->
+                <div id="batchPreviewBox" class="batch-preview-box hidden">
+                  <div class="batch-preview-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span id="batchPreviewTitle">Batch Distribution Plan</span>
+                  </div>
+                  <div id="batchPreviewList" class="batch-preview-list"></div>
+                </div>
+              </div>
+
               <div class="schedule-hint">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span><strong>Fire-and-Forget:</strong> Registered directly with Windows Task Scheduler — sends automatically on schedule even if this app is closed!</span>
+                <span><strong>Fire-and-Forget:</strong> Automatically executed by Windows Task Scheduler in daily batches even if this application is closed.</span>
               </div>
 
               <!-- Countdown Display -->
               <div id="scheduleCountdownBox" class="schedule-countdown hidden">
                 <div class="countdown-pulse"></div>
-                <div class="countdown-info">
-                  <div class="countdown-label">Campaign fires in</div>
+                <div class="countdown-info" style="flex: 1;">
+                  <div class="countdown-label" id="scheduleCountdownLabel">Next batch fires in</div>
                   <div id="scheduleCountdownTimer" class="countdown-timer">00:00:00</div>
                   <div id="scheduleTargetTime" class="countdown-target"></div>
-                  <div class="countdown-os-status">⚡ Auto-managed by Windows Background Task</div>
+                  <div class="countdown-os-status">⚡ Auto-managed by Windows Background Task Scheduler</div>
                 </div>
+              </div>
+
+              <!-- Active Multi-Batch Progress Timeline -->
+              <div id="activeBatchProgressBox" class="active-batch-progress-box hidden">
+                <div class="active-batch-header">
+                  <div class="active-batch-title">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <span>Multi-Day Campaign Schedule</span>
+                  </div>
+                  <span id="activeBatchProgressBadge" class="active-batch-badge">0 / 0 Batches Completed</span>
+                </div>
+                <div id="activeBatchTimeline" class="active-batch-timeline"></div>
               </div>
             </div>
           </section>
@@ -344,6 +439,7 @@
                 <button class="tab-btn active" data-filter="all">All (<span id="filterCountAll">0</span>)</button>
                 <button class="tab-btn" data-filter="sent">Sent (<span id="filterCountSent">0</span>)</button>
                 <button class="tab-btn" data-filter="failed">Failed (<span id="filterCountFailed">0</span>)</button>
+                <button class="tab-btn" data-filter="invalid">Invalid (<span id="filterCountInvalid">0</span>)</button>
                 <button class="tab-btn" data-filter="pending">Pending (<span id="filterCountPending">0</span>)</button>
               </div>
               <div class="search-box">

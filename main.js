@@ -4,6 +4,7 @@ const fs   = require('fs');
 const { exec } = require('child_process');
 const XLSX = require('xlsx');
 const nodemailer = require('nodemailer');
+const { validateEmail, validateBatch } = require('./emailValidator');
 
 let mainWindow;
 
@@ -168,8 +169,8 @@ ipcMain.handle('smtp:send-email', async (event, { smtpConfig, mailData }) => {
         : smtpConfig.user,
       to: mailData.to,
       subject: mailData.subject,
-      text: mailData.body,
-      html: mailData.isHtml ? mailData.body : (mailData.body || '').replace(/\n/g, '<br>')
+      text: mailData.text || mailData.body,
+      html: mailData.html || (mailData.isHtml ? mailData.body : (mailData.body || '').replace(/\n/g, '<br>'))
     };
 
     if (mailData.cc && String(mailData.cc).trim()) {
@@ -181,13 +182,20 @@ ipcMain.handle('smtp:send-email', async (event, { smtpConfig, mailData }) => {
     }
 
     if (mailData.attachmentPath && String(mailData.attachmentPath).trim()) {
-      const rawPaths = String(mailData.attachmentPath).split(/[,;]+/).map(p => p.trim()).filter(Boolean);
+      const rawPaths = String(mailData.attachmentPath)
+        .split(/[,;]+/)
+        .map(p => p.trim().replace(/^["']|["']$/g, ''))
+        .filter(Boolean);
       const attachments = [];
       for (const attachPath of rawPaths) {
         if (!fs.existsSync(attachPath)) {
           throw new Error(`Attachment file not found: ${attachPath}`);
         }
-        attachments.push({ path: attachPath });
+        const cleanFileName = path.basename(attachPath.replace(/\\/g, '/'));
+        attachments.push({
+          filename: cleanFileName,
+          path: attachPath
+        });
       }
       if (attachments.length > 0) {
         mailOptions.attachments = attachments;
@@ -381,4 +389,63 @@ ipcMain.handle('schedule:get-latest-log', async () => {
     return { success: false, error: err.message };
   }
 });
+
+// ===========================================================================
+// IPC Handlers: Email Verification (Syntax & Active Domain MX Validation)
+// ===========================================================================
+ipcMain.handle('email:validate', async (event, email, options) => {
+  try {
+    return await validateEmail(email, options);
+  } catch (err) {
+    return {
+      isValid: false,
+      isActive: false,
+      reason: err.message || 'Validation error',
+      details: { error: err.message }
+    };
+  }
+});
+
+ipcMain.handle('email:validate-batch', async (event, emails, options) => {
+  try {
+    const results = await validateBatch(emails, options);
+    const validCount = results.filter(r => r.isValid && r.isActive).length;
+    const invalidCount = results.length - validCount;
+    return {
+      success: true,
+      total: results.length,
+      validCount,
+      invalidCount,
+      results
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// ===========================================================================
+// IPC Handlers: Signature File Persistence
+// ===========================================================================
+ipcMain.handle('signature:load', async () => {
+  try {
+    const sigFile = path.join(__dirname, 'signature.txt');
+    if (fs.existsSync(sigFile)) {
+      return { success: true, signature: fs.readFileSync(sigFile, 'utf8') };
+    }
+    return { success: true, signature: null };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('signature:save', async (event, signatureText) => {
+  try {
+    const sigFile = path.join(__dirname, 'signature.txt');
+    fs.writeFileSync(sigFile, signatureText || '', 'utf8');
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 

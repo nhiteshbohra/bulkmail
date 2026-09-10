@@ -1,41 +1,58 @@
-# Dependencies
-node_modules/
+# ==============================================================================
+# AutoMail Excel Bulk Mailer - .gitignore
+# ==============================================================================
 
-# Logs
+# 1. Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# 2. Sensitive Credentials & Personal Configurations
+.env
+.env.local
+.env.*.local
+signature.txt
+
+# 3. Campaign State & Scheduler Execution Files (Protects SMTP Passwords & Data)
+schedule_data.json
+schedule_data.json.bak
+schedule_data*.json
+.sender.lock
+run_schedule.bat
+campaign_log_*.json
+
+# 4. Exported Execution Reports & Spreadsheets
+Email_Campaign_Report_*.xlsx
+Email_Campaign_Report_*.csv
+
+# 5. User Data & Contact Spreadsheets (Prevent accidental commit of recipient lists)
+*.xlsx
+*.xls
+*.csv
+
+# 6. Temporary Office / Excel Lock Files
+~$*
+*.tmp
+
+# 7. Application Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Environment and Secrets
-.env
-.env.local
-.env.*.local
-
-# OS Generated Files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Temporary Office / Excel Lock Files
-~$*
-.xlsx
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-.venv/
-
-
-# Generated / Scratch Data
-numbers.txt
-
-# Build and Packaging Outputs
+# 8. Build, Packaging & Distribution Outputs
 dist/
 build/
 out/
+release/
+
+# 9. Operating System & IDE Files
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sublime-workspace
