@@ -25,15 +25,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   // DOM Elements
-  const modeWebBtn = document.getElementById('modeWebBtn');
-  const modeSmtpBtn = document.getElementById('modeSmtpBtn');
-  const webEnginePanel = document.getElementById('webEnginePanel');
   const smtpEnginePanel = document.getElementById('smtpEnginePanel');
-  const btnGoogleSignIn = document.getElementById('btnGoogleSignIn');
-  const btnCheckGoogleAuth = document.getElementById('btnCheckGoogleAuth');
-  const googleAuthBadge = document.getElementById('googleAuthBadge');
-
   const presetSelect = document.getElementById('presetSelect');
+
   const smtpHost = document.getElementById('smtpHost');
   const smtpPort = document.getElementById('smtpPort');
   const smtpSecure = document.getElementById('smtpSecure');
