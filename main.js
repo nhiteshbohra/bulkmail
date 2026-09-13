@@ -24,7 +24,32 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
+  const isScreenshotMode = process.env.CAPTURE_SCREENSHOT === 'true' || process.argv.some(arg => String(arg).includes('capture-screenshot'));
+  if (isScreenshotMode) {
+    mainWindow.once('ready-to-show', () => {
+      mainWindow.show();
+      mainWindow.focus();
+    });
+    mainWindow.webContents.on('did-finish-load', () => {
+      setTimeout(async () => {
+        try {
+          const image = await mainWindow.webContents.capturePage();
+          const imgPath = path.join(__dirname, 'image.png');
+          fs.writeFileSync(imgPath, image.toPNG());
+          console.log('[AutoMail] Screenshot captured successfully to image.png! Bytes:', image.toPNG().length);
+          app.exit(0);
+        } catch (err) {
+          console.error('[AutoMail] Failed to capture screenshot:', err.message);
+          app.exit(1);
+        }
+      }, 4500);
+    });
+    mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'), { query: { screenshot: 'true' } });
+  } else {
+    mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
+  }
+
+
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -33,6 +58,7 @@ function createWindow() {
   // Remove default menu for a clean app feel
   mainWindow.setMenuBarVisibility(false);
 }
+
 
 app.whenReady().then(() => {
   createWindow();

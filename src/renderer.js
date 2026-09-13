@@ -1511,6 +1511,67 @@ document.addEventListener('DOMContentLoaded', () => {
     showScheduleToast(`⚡ Scheduled in Windows Task Scheduler: Campaign fires at ${targetDate.toLocaleString()}`);
   })();
 
+  // ── Screenshot Capture Mode Setup ─────────────────────────────────────────
+  if (window.location.search.includes('screenshot=true')) {
+    (async () => {
+      if (smtpHost) smtpHost.value = 'smtp.gmail.com';
+      if (smtpPort) smtpPort.value = '587';
+      if (smtpUser) smtpUser.value = 'nhitesh.bohra@gmail.com';
+      if (smtpFromName) smtpFromName.value = 'Hitesh Bohra';
+      if (smtpPass) smtpPass.value = 'abcdefghijklmnop';
+      if (emailSignature) emailSignature.value = '--\nBest regards,\nHitesh Bohra\n+91 9876543210 | [LinkedIn](https://linkedin.com/in/nhiteshbohra) | [GitHub](https://github.com/nhiteshbohra)';
+      
+      const badge = document.getElementById('smtpStatusBadge');
+      if (badge) {
+        badge.className = 'status-indicator connected';
+        badge.querySelector('.text').textContent = 'SMTP: Verified';
+      }
+
+      if (chkJitterDelay && jitterRangeBox) {
+        chkJitterDelay.checked = true;
+        jitterRangeBox.classList.remove('hidden');
+      }
+
+      // Load sample file if available
+      try {
+        const samplePath = 'f:\\projects\\bulkmail\\sample_contacts.xlsx';
+        const res = await window.electronAPI.parseFile(samplePath);
+        if (res && res.success) {
+          state.excelData = res;
+          if (fileInfoBox && fileNameText && fileRowsCount) {
+            fileNameText.textContent = res.fileName;
+            fileRowsCount.textContent = `${res.totalRows} rows loaded`;
+            fileInfoBox.classList.remove('hidden');
+            if (dropZone) dropZone.classList.add('hidden');
+          }
+          if (mappingSection) mappingSection.classList.remove('hidden');
+          populateColumnSelects(res.headers);
+          
+          // Auto map columns
+          if (mapEmail) mapEmail.value = res.headers.find(h => /email/i.test(h)) || res.headers[0];
+          if (mapTopic) mapTopic.value = res.headers.find(h => /topic|subject/i.test(h)) || res.headers[1] || res.headers[0];
+          if (mapBody) mapBody.value = res.headers.find(h => /body|message/i.test(h)) || res.headers[2] || res.headers[0];
+          generateLogsFromMapping();
+
+          // Mark some logs as sent for beautiful UI counters
+          if (state.campaignLogs.length >= 10) {
+            for (let i = 0; i < 8; i++) {
+              state.campaignLogs[i].status = 'sent';
+              state.campaignLogs[i].sentTime = new Date().toLocaleTimeString();
+              state.campaignLogs[i].error = '-';
+            }
+            state.campaignLogs[8].status = 'failed';
+            state.campaignLogs[8].sentTime = new Date().toLocaleTimeString();
+            state.campaignLogs[8].error = 'Recipient mailbox full (552)';
+            renderLogTable();
+            updateMetrics();
+          }
+        }
+      } catch (e) { console.error('Screenshot pre-load error:', e); }
+    })();
+  }
+
+
   function showScheduleToast(message) {
     const toast = document.createElement('div');
     toast.className = 'schedule-toast';
