@@ -16,10 +16,10 @@
   "author": "Hitesh Bohra",
   "license": "ISC",
   "dependencies": {
-    "nodemailer": "^6.9.13",
-    "xlsx": "^0.18.5"
+    "nodemailer": "^10.0.9",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
-    "electron": "^29.1.0"
+    "electron": "^44.3.0"
   }
 }
