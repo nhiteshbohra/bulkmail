@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (fileRes && fileRes.success && fileRes.signature) {
           saved = fileRes.signature;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     emailSignature.value = saved;
   }
@@ -599,8 +599,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const filteredLogs = state.campaignLogs.filter(item => {
       const matchesFilter = filter === 'all' || item.status === filter;
-      const matchesSearch = !searchTerm || 
-        item.recipientEmail.toLowerCase().includes(searchTerm) || 
+      const matchesSearch = !searchTerm ||
+        item.recipientEmail.toLowerCase().includes(searchTerm) ||
         item.topic.toLowerCase().includes(searchTerm);
       return matchesFilter && matchesSearch;
     });
@@ -910,8 +910,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (statusCell) statusCell.innerHTML = getStatusBadge(item.status);
       if (timeCell) timeCell.textContent = item.sentTime;
       if (errorCell) {
-        errorCell.innerHTML = item.error !== '-' 
-          ? `<span class="error-text">${escapeHtml(item.error)}</span>` 
+        errorCell.innerHTML = item.error !== '-'
+          ? `<span class="error-text">${escapeHtml(item.error)}</span>`
           : '-';
       }
     } else {
@@ -1055,27 +1055,27 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===========================================================================
   // Schedule Campaign Feature (Multi-Day Batch Support + Windows Task Scheduler)
   // ===========================================================================
-  const scheduleDateTime        = document.getElementById('scheduleDateTime');
-  const btnSchedule             = document.getElementById('btnSchedule');
-  const btnCancelSchedule       = document.getElementById('btnCancelSchedule');
-  const scheduleCountdownBox    = document.getElementById('scheduleCountdownBox');
-  const scheduleCountdownLabel  = document.getElementById('scheduleCountdownLabel');
-  const scheduleCountdownTimer  = document.getElementById('scheduleCountdownTimer');
-  const scheduleTargetTime      = document.getElementById('scheduleTargetTime');
-  const scheduleBadge           = document.getElementById('scheduleBadge');
-  const scheduleCard            = document.getElementById('scheduleCard');
+  const scheduleDateTime = document.getElementById('scheduleDateTime');
+  const btnSchedule = document.getElementById('btnSchedule');
+  const btnCancelSchedule = document.getElementById('btnCancelSchedule');
+  const scheduleCountdownBox = document.getElementById('scheduleCountdownBox');
+  const scheduleCountdownLabel = document.getElementById('scheduleCountdownLabel');
+  const scheduleCountdownTimer = document.getElementById('scheduleCountdownTimer');
+  const scheduleTargetTime = document.getElementById('scheduleTargetTime');
+  const scheduleBadge = document.getElementById('scheduleBadge');
+  const scheduleCard = document.getElementById('scheduleCard');
 
   // Batch Configuration Elements
-  const chkDailyBatches         = document.getElementById('chkDailyBatches');
-  const inputDailyLimit         = document.getElementById('inputDailyLimit');
-  const chkWeekdaysOnly         = document.getElementById('chkWeekdaysOnly');
-  const batchOptionsSubRow      = document.getElementById('batchOptionsSubRow');
-  const batchPreviewBox         = document.getElementById('batchPreviewBox');
-  const batchPreviewTitle       = document.getElementById('batchPreviewTitle');
-  const batchPreviewList        = document.getElementById('batchPreviewList');
-  const activeBatchProgressBox  = document.getElementById('activeBatchProgressBox');
-  const activeBatchProgressBadge= document.getElementById('activeBatchProgressBadge');
-  const activeBatchTimeline     = document.getElementById('activeBatchTimeline');
+  const chkDailyBatches = document.getElementById('chkDailyBatches');
+  const inputDailyLimit = document.getElementById('inputDailyLimit');
+  const chkWeekdaysOnly = document.getElementById('chkWeekdaysOnly');
+  const batchOptionsSubRow = document.getElementById('batchOptionsSubRow');
+  const batchPreviewBox = document.getElementById('batchPreviewBox');
+  const batchPreviewTitle = document.getElementById('batchPreviewTitle');
+  const batchPreviewList = document.getElementById('batchPreviewList');
+  const activeBatchProgressBox = document.getElementById('activeBatchProgressBox');
+  const activeBatchProgressBadge = document.getElementById('activeBatchProgressBadge');
+  const activeBatchTimeline = document.getElementById('activeBatchTimeline');
 
   // scheduleTimeoutId declared at top of scope
   let countdownIntervalId = null;
@@ -1223,7 +1223,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const now = new Date(Date.now() + 60000);
     const pad = n => String(n).padStart(2, '0');
     scheduleDateTime.min =
-      `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
   }
 
   function startCountdownUI(isoString) {
@@ -1236,7 +1236,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       const s = Math.floor(remaining / 1000);
       scheduleCountdownTimer.textContent =
-        `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+        `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
     }
     tick();
     countdownIntervalId = setInterval(tick, 1000);
@@ -1260,7 +1260,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const pendingBatch = savedData.batches.find(b => b.status === 'pending');
       if (pendingBatch) {
         scheduleCountdownLabel.textContent = `Batch #${pendingBatch.batchNumber} of ${savedData.batches.length} fires in`;
-        scheduleTargetTime.textContent = `Next Run: ${pendingBatch.dayLabel} at ${new Date(pendingBatch.isoString).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+        scheduleTargetTime.textContent = `Next Run: ${pendingBatch.dayLabel} at ${new Date(pendingBatch.isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
         scheduleBadge.textContent = `Batch ${pendingBatch.batchNumber}/${savedData.batches.length} Active`;
       } else {
         scheduleCountdownLabel.textContent = `All ${savedData.batches.length} batches complete!`;
@@ -1273,8 +1273,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activeBatchProgressBox) activeBatchProgressBox.classList.add('hidden');
     }
 
-    if (scheduleDateTime.value !== isoString.slice(0,16)) {
-      scheduleDateTime.value = isoString.slice(0,16);
+    if (scheduleDateTime.value !== isoString.slice(0, 16)) {
+      scheduleDateTime.value = isoString.slice(0, 16);
     }
   }
 
@@ -1283,7 +1283,7 @@ document.addEventListener('DOMContentLoaded', () => {
     scheduleTimeoutId = setTimeout(async () => {
       clearInterval(countdownIntervalId);
       countdownIntervalId = null;
-      scheduleTimeoutId   = null;
+      scheduleTimeoutId = null;
 
       // Allow background sender to execute and check updated schedule
       setTimeout(async () => {
@@ -1307,7 +1307,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function resetScheduleUI() {
     if (countdownIntervalId) { clearInterval(countdownIntervalId); countdownIntervalId = null; }
-    if (scheduleTimeoutId)   { clearTimeout(scheduleTimeoutId);   scheduleTimeoutId = null; }
+    if (scheduleTimeoutId) { clearTimeout(scheduleTimeoutId); scheduleTimeoutId = null; }
     scheduleCountdownBox.classList.add('hidden');
     scheduleBadge.classList.add('hidden');
     btnCancelSchedule.classList.add('hidden');
@@ -1317,8 +1317,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (inputDailyLimit) inputDailyLimit.disabled = false;
     if (chkWeekdaysOnly) chkWeekdaysOnly.disabled = false;
     if (activeBatchProgressBox) activeBatchProgressBox.classList.add('hidden');
-    scheduleDateTime.value    = '';
-    btnSchedule.disabled      = true;
+    scheduleDateTime.value = '';
+    btnSchedule.disabled = true;
     refreshScheduleMin();
     updateBatchPreview();
   }
@@ -1375,15 +1375,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 1. Build payload to persist
       const payload = {
-        isoString:    firstIso,
-        smtpConfig:   smtpConfig,
+        isoString: firstIso,
+        smtpConfig: smtpConfig,
         campaignLogs: JSON.parse(JSON.stringify(state.campaignLogs)),
-        emailDelay:   parseInt(emailDelay.value, 10) || 0,
-        dailyLimit:   dailyLimit,
+        emailDelay: parseInt(emailDelay.value, 10) || 0,
+        dailyLimit: dailyLimit,
         weekdaysOnly: weekdays,
-        signature:    emailSignature ? emailSignature.value : '',
-        savedAt:      new Date().toISOString(),
-        batches:      batches
+        signature: emailSignature ? emailSignature.value : '',
+        savedAt: new Date().toISOString(),
+        batches: batches
       };
 
       await window.electronAPI.saveSchedule(payload);
@@ -1490,7 +1490,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Legacy single schedule
     const targetDate = new Date(saved.isoString);
-    const msUntil    = targetDate - Date.now();
+    const msUntil = targetDate - Date.now();
 
     if (msUntil <= 0) {
       await window.electronAPI.deleteOsTask();
@@ -1510,67 +1510,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     showScheduleToast(`⚡ Scheduled in Windows Task Scheduler: Campaign fires at ${targetDate.toLocaleString()}`);
   })();
-
-  // ── Screenshot Capture Mode Setup ─────────────────────────────────────────
-  if (window.location.search.includes('screenshot=true')) {
-    (async () => {
-      if (smtpHost) smtpHost.value = 'smtp.gmail.com';
-      if (smtpPort) smtpPort.value = '587';
-      if (smtpUser) smtpUser.value = 'nhitesh.bohra@gmail.com';
-      if (smtpFromName) smtpFromName.value = 'Hitesh Bohra';
-      if (smtpPass) smtpPass.value = 'abcdefghijklmnop';
-      if (emailSignature) emailSignature.value = '--\nBest regards,\nHitesh Bohra\n+91 9876543210 | [LinkedIn](https://linkedin.com/in/nhiteshbohra) | [GitHub](https://github.com/nhiteshbohra)';
-      
-      const badge = document.getElementById('smtpStatusBadge');
-      if (badge) {
-        badge.className = 'status-indicator connected';
-        badge.querySelector('.text').textContent = 'SMTP: Verified';
-      }
-
-      if (chkJitterDelay && jitterRangeBox) {
-        chkJitterDelay.checked = true;
-        jitterRangeBox.classList.remove('hidden');
-      }
-
-      // Load sample file if available
-      try {
-        const samplePath = 'f:\\projects\\bulkmail\\sample_contacts.xlsx';
-        const res = await window.electronAPI.parseFile(samplePath);
-        if (res && res.success) {
-          state.excelData = res;
-          if (fileInfoBox && fileNameText && fileRowsCount) {
-            fileNameText.textContent = res.fileName;
-            fileRowsCount.textContent = `${res.totalRows} rows loaded`;
-            fileInfoBox.classList.remove('hidden');
-            if (dropZone) dropZone.classList.add('hidden');
-          }
-          if (mappingSection) mappingSection.classList.remove('hidden');
-          populateColumnSelects(res.headers);
-          
-          // Auto map columns
-          if (mapEmail) mapEmail.value = res.headers.find(h => /email/i.test(h)) || res.headers[0];
-          if (mapTopic) mapTopic.value = res.headers.find(h => /topic|subject/i.test(h)) || res.headers[1] || res.headers[0];
-          if (mapBody) mapBody.value = res.headers.find(h => /body|message/i.test(h)) || res.headers[2] || res.headers[0];
-          generateLogsFromMapping();
-
-          // Mark some logs as sent for beautiful UI counters
-          if (state.campaignLogs.length >= 10) {
-            for (let i = 0; i < 8; i++) {
-              state.campaignLogs[i].status = 'sent';
-              state.campaignLogs[i].sentTime = new Date().toLocaleTimeString();
-              state.campaignLogs[i].error = '-';
-            }
-            state.campaignLogs[8].status = 'failed';
-            state.campaignLogs[8].sentTime = new Date().toLocaleTimeString();
-            state.campaignLogs[8].error = 'Recipient mailbox full (552)';
-            renderLogTable();
-            updateMetrics();
-          }
-        }
-      } catch (e) { console.error('Screenshot pre-load error:', e); }
-    })();
-  }
-
 
   function showScheduleToast(message) {
     const toast = document.createElement('div');
@@ -1771,7 +1710,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Update preview button state whenever campaignLogs update
   const origUpdateStartButtonState = updateStartButtonState;
-  updateStartButtonState = function() {
+  updateStartButtonState = function () {
     origUpdateStartButtonState();
     if (btnPreviewEmail) {
       btnPreviewEmail.disabled = state.campaignLogs.length === 0;
