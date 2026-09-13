@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const fs   = require('fs');
+const fs = require('fs');
 const { exec } = require('child_process');
 const XLSX = require('xlsx');
 const nodemailer = require('nodemailer');
@@ -164,8 +164,8 @@ ipcMain.handle('smtp:send-email', async (event, { smtpConfig, mailData }) => {
     });
 
     const mailOptions = {
-      from: smtpConfig.fromName 
-        ? `"${smtpConfig.fromName}" <${smtpConfig.user}>` 
+      from: smtpConfig.fromName
+        ? `"${smtpConfig.fromName}" <${smtpConfig.user}>`
         : smtpConfig.user,
       to: mailData.to,
       subject: mailData.subject,
@@ -203,15 +203,15 @@ ipcMain.handle('smtp:send-email', async (event, { smtpConfig, mailData }) => {
     }
 
     const info = await transporter.sendMail(mailOptions);
-    return { 
-      success: true, 
-      messageId: info.messageId, 
-      response: info.response 
+    return {
+      success: true,
+      messageId: info.messageId,
+      response: info.response
     };
   } catch (error) {
-    return { 
-      success: false, 
-      error: error.message || 'Failed to send email' 
+    return {
+      success: false,
+      error: error.message || 'Failed to send email'
     };
   }
 });
@@ -250,8 +250,8 @@ ipcMain.handle('excel:export-report', async (event, reportData) => {
 // ===========================================================================
 const SCHEDULE_FILE = path.join(__dirname, 'schedule_data.json');
 const SENDER_SCRIPT = path.join(__dirname, 'sender.js');
-const BAT_FILE      = path.join(__dirname, 'run_schedule.bat');
-const TASK_NAME     = 'AutoMailExcelSchedule';
+const BAT_FILE = path.join(__dirname, 'run_schedule.bat');
+const TASK_NAME = 'AutoMailExcelSchedule';
 
 // Save schedule data to project root (where sender.js can find it)
 ipcMain.handle('schedule:save', async (event, scheduleData) => {
@@ -302,11 +302,11 @@ ipcMain.handle('schedule:create-os-task', async (event, { isoString }) => {
     fs.writeFileSync(BAT_FILE, batContent, 'utf8');
 
     // Parse date/time for schtasks
-    const d   = new Date(isoString);
-    const mm  = String(d.getMonth() + 1).padStart(2, '0');
-    const dd  = String(d.getDate()).padStart(2, '0');
+    const d = new Date(isoString);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
     const yyyy = d.getFullYear();
-    const hh  = String(d.getHours()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
     const min = String(d.getMinutes()).padStart(2, '0');
 
     // Try dd/mm/yyyy first (standard on this system), fallback to mm/dd/yyyy if needed
@@ -344,8 +344,8 @@ ipcMain.handle('schedule:delete-os-task', async () => {
       resolve();
     });
   });
-  try { if (fs.existsSync(SCHEDULE_FILE)) fs.unlinkSync(SCHEDULE_FILE); } catch(e) {}
-  try { if (fs.existsSync(BAT_FILE))      fs.unlinkSync(BAT_FILE); }      catch(e) {}
+  try { if (fs.existsSync(SCHEDULE_FILE)) fs.unlinkSync(SCHEDULE_FILE); } catch (e) { }
+  try { if (fs.existsSync(BAT_FILE)) fs.unlinkSync(BAT_FILE); } catch (e) { }
   return errors.length === 0
     ? { success: true }
     : { success: false, error: errors.join('; ') };
@@ -360,7 +360,7 @@ ipcMain.handle('schedule:check-os-task', async () => {
       });
     });
     return { exists: output.includes(TASK_NAME), raw: output };
-  } catch(e) {
+  } catch (e) {
     return { exists: false };
   }
 });

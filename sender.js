@@ -3,16 +3,16 @@
  * Called by Windows Task Scheduler. Does NOT require Electron to be running.
  */
 'use strict';
-const path       = require('path');
-const fs         = require('fs');
+const path = require('path');
+const fs = require('fs');
 const nodemailer = require('nodemailer');
-const { exec }   = require('child_process');
+const { exec } = require('child_process');
 const { validateEmail, formatEmailContent } = require('./emailValidator');
 
 const DATA_FILE = path.join(__dirname, 'schedule_data.json');
 const TASK_NAME = 'AutoMailExcelSchedule';
 const LOCK_FILE = path.join(__dirname, '.sender.lock');
-const SIG_FILE  = path.join(__dirname, 'signature.txt');
+const SIG_FILE = path.join(__dirname, 'signature.txt');
 
 function getActiveSignature(data) {
   if (data && data.signature && data.signature.trim()) {
@@ -22,7 +22,7 @@ function getActiveSignature(data) {
     try {
       const content = fs.readFileSync(SIG_FILE, 'utf8').trim();
       if (content) return content;
-    } catch(e) {}
+    } catch (e) { }
   }
   return '';
 }
@@ -30,30 +30,30 @@ function getActiveSignature(data) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function writeLog(results, batchLabel) {
-  const ts      = new Date().toISOString().replace(/[:.]/g, '-');
-  const prefix  = batchLabel ? `campaign_log_${batchLabel}_` : 'campaign_log_';
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  const prefix = batchLabel ? `campaign_log_${batchLabel}_` : 'campaign_log_';
   const logPath = path.join(__dirname, prefix + ts + '.json');
-  try { fs.writeFileSync(logPath, JSON.stringify(results, null, 2), 'utf8'); } catch(e) {}
+  try { fs.writeFileSync(logPath, JSON.stringify(results, null, 2), 'utf8'); } catch (e) { }
   console.log('[AutoMail] Log written to', logPath);
   return logPath;
 }
 
 function cleanupSchedule() {
-  try { if (fs.existsSync(DATA_FILE)) fs.unlinkSync(DATA_FILE); } catch(e) {}
-  exec('schtasks /delete /tn "' + TASK_NAME + '" /f', () => {});
+  try { if (fs.existsSync(DATA_FILE)) fs.unlinkSync(DATA_FILE); } catch (e) { }
+  exec('schtasks /delete /tn "' + TASK_NAME + '" /f', () => { });
   const bat = path.join(__dirname, 'run_schedule.bat');
-  if (fs.existsSync(bat)) try { fs.unlinkSync(bat); } catch(e) {}
+  if (fs.existsSync(bat)) try { fs.unlinkSync(bat); } catch (e) { }
   console.log('[AutoMail] Cleaned up schedule files and Windows scheduled task.');
 }
 
 function rescheduleNextTask(isoString) {
-  const d    = new Date(isoString);
-  const mm   = String(d.getMonth() + 1).padStart(2, '0');
-  const dd   = String(d.getDate()).padStart(2, '0');
+  const d = new Date(isoString);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
   const yyyy = d.getFullYear();
-  const hh   = String(d.getHours()).padStart(2, '0');
-  const min  = String(d.getMinutes()).padStart(2, '0');
-  const bat  = path.join(__dirname, 'run_schedule.bat');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  const bat = path.join(__dirname, 'run_schedule.bat');
 
   let cmd = `schtasks /create /tn "${TASK_NAME}" /tr "\\"${bat}\\"" /sc once /sd ${dd}/${mm}/${yyyy} /st ${hh}:${min} /f`;
   return new Promise((resolve) => {
@@ -93,23 +93,23 @@ async function run() {
         console.warn('[AutoMail] Another sender process is currently running. Exiting.');
         return;
       }
-    } catch(e) {}
+    } catch (e) { }
   }
-  try { fs.writeFileSync(LOCK_FILE, String(process.pid), 'utf8'); } catch(e) {}
+  try { fs.writeFileSync(LOCK_FILE, String(process.pid), 'utf8'); } catch (e) { }
 
   let data;
   try {
     data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  } catch(e) {
+  } catch (e) {
     console.error('[AutoMail] Parse error reading schedule_data.json:', e.message);
-    try { fs.unlinkSync(LOCK_FILE); } catch(e) {}
+    try { fs.unlinkSync(LOCK_FILE); } catch (e) { }
     return;
   }
 
   const { smtpConfig, emailDelay = 0 } = data;
   if (!smtpConfig) {
     console.error('[AutoMail] Missing SMTP configuration. Aborting.');
-    try { fs.unlinkSync(LOCK_FILE); } catch(e) {}
+    try { fs.unlinkSync(LOCK_FILE); } catch (e) { }
     cleanupSchedule();
     return;
   }
@@ -117,19 +117,19 @@ async function run() {
   // Determine if this is a multi-batch schedule or a single legacy campaign
   const isMultiBatch = Array.isArray(data.batches) && data.batches.length > 0;
   let currentBatch = null;
-  let itemsToSend  = [];
-  let batchLabel   = '';
+  let itemsToSend = [];
+  let batchLabel = '';
 
   if (isMultiBatch) {
     currentBatch = data.batches.find(b => b.status === 'pending');
     if (!currentBatch) {
       console.log('[AutoMail] All batches in schedule_data.json are already completed!');
-      try { fs.unlinkSync(LOCK_FILE); } catch(e) {}
+      try { fs.unlinkSync(LOCK_FILE); } catch (e) { }
       cleanupSchedule();
       return;
     }
     itemsToSend = currentBatch.items || [];
-    batchLabel  = `batch_${currentBatch.batchNumber}`;
+    batchLabel = `batch_${currentBatch.batchNumber}`;
     console.log(`[AutoMail] Processing Batch #${currentBatch.batchNumber} of ${data.batches.length} (${currentBatch.dayLabel || 'Day'})`);
     console.log(`[AutoMail] Batch item count: ${itemsToSend.length} emails`);
   } else {
@@ -144,7 +144,7 @@ async function run() {
       currentBatch.sentAt = new Date().toISOString();
       fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
     }
-    try { fs.unlinkSync(LOCK_FILE); } catch(e) {}
+    try { fs.unlinkSync(LOCK_FILE); } catch (e) { }
     return;
   }
 
@@ -156,17 +156,17 @@ async function run() {
     secure: smtpConfig.secure === true || portNum === 465,
     auth: { user: smtpConfig.user, pass: smtpConfig.pass },
     connectionTimeout: 15000,
-    greetingTimeout:   15000,
-    socketTimeout:     20000
+    greetingTimeout: 15000,
+    socketTimeout: 20000
   });
 
   try {
     await transporter.verify();
     console.log('[AutoMail] SMTP connection verified successfully');
-  } catch(err) {
+  } catch (err) {
     console.error('[AutoMail] SMTP connection failed:', err.message);
     writeLog([{ error: 'SMTP connection failed: ' + err.message, timestamp: new Date().toISOString() }], 'error');
-    try { fs.unlinkSync(LOCK_FILE); } catch(e) {}
+    try { fs.unlinkSync(LOCK_FILE); } catch (e) { }
     return;
   }
 
@@ -181,8 +181,8 @@ async function run() {
     const validation = await validateEmail(item.recipientEmail);
     if (!validation.isValid || !validation.isActive) {
       console.warn(prefix, 'Skipping inactive/invalid email:', item.recipientEmail, `(${validation.reason})`);
-      item.status   = 'failed';
-      item.error    = `Skipped (Quota saved): ${validation.reason}`;
+      item.status = 'failed';
+      item.error = `Skipped (Quota saved): ${validation.reason}`;
       item.sentTime = new Date().toLocaleString();
       results.push({ ...item });
       fail++;
@@ -199,14 +199,14 @@ async function run() {
       const formatted = formatEmailContent(item.body, signature);
 
       const opts = {
-        from:    fromAddr,
-        to:      item.recipientEmail,
+        from: fromAddr,
+        to: item.recipientEmail,
         subject: item.topic,
-        text:    formatted.text,
-        html:    formatted.html
+        text: formatted.text,
+        html: formatted.html
       };
 
-      if (item.cc  && String(item.cc).trim())  opts.cc  = String(item.cc).trim();
+      if (item.cc && String(item.cc).trim()) opts.cc = String(item.cc).trim();
       if (item.bcc && String(item.bcc).trim()) opts.bcc = String(item.bcc).trim();
 
       if (item.attachmentPath && String(item.attachmentPath).trim()) {
@@ -224,19 +224,19 @@ async function run() {
 
       await transporter.sendMail(opts);
       sent++;
-      item.status   = 'sent';
+      item.status = 'sent';
       item.sentTime = new Date().toLocaleString();
-      item.error    = '-';
+      item.error = '-';
       console.log(prefix, 'Sent ->', item.recipientEmail);
       results.push({ ...item });
 
       if (emailDelay > 0 && i < itemsToSend.length - 1) {
         await sleep(emailDelay * 1000);
       }
-    } catch(err) {
+    } catch (err) {
       fail++;
-      item.status   = 'failed';
-      item.error    = err.message;
+      item.status = 'failed';
+      item.error = err.message;
       item.sentTime = new Date().toLocaleString();
       console.error(prefix, 'Failed ->', item.recipientEmail, ':', err.message);
       results.push({ ...item });
@@ -244,7 +244,7 @@ async function run() {
 
     // Periodically sync progress every 20 emails
     if (i > 0 && i % 20 === 0 && isMultiBatch) {
-      try { fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8'); } catch(e) {}
+      try { fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8'); } catch (e) { }
     }
   }
 
@@ -252,8 +252,8 @@ async function run() {
   writeLog(results, batchLabel);
 
   if (isMultiBatch && currentBatch) {
-    currentBatch.status    = 'completed';
-    currentBatch.sentAt    = new Date().toISOString();
+    currentBatch.status = 'completed';
+    currentBatch.sentAt = new Date().toISOString();
     currentBatch.sentCount = sent;
     currentBatch.failCount = fail;
 
@@ -275,13 +275,13 @@ async function run() {
     cleanupSchedule();
   }
 
-  try { fs.unlinkSync(LOCK_FILE); } catch(e) {}
+  try { fs.unlinkSync(LOCK_FILE); } catch (e) { }
   console.log('[AutoMail] Sender finished at', new Date().toLocaleString());
   console.log('[AutoMail] ======================================================');
 }
 
 run().catch(err => {
   console.error('[AutoMail] Fatal error:', err);
-  try { fs.unlinkSync(LOCK_FILE); } catch(e) {}
+  try { fs.unlinkSync(LOCK_FILE); } catch (e) { }
   process.exit(1);
 });
