@@ -448,4 +448,108 @@ ipcMain.handle('signature:save', async (event, signatureText) => {
   }
 });
 
+// ===========================================================================
+// IPC Handlers: Templates Management
+// ===========================================================================
+const TEMPLATES_FILE = path.join(__dirname, 'templates.json');
+
+ipcMain.handle('templates:load', async () => {
+  try {
+    if (!fs.existsSync(TEMPLATES_FILE)) return { success: true, templates: [] };
+    const content = fs.readFileSync(TEMPLATES_FILE, 'utf8');
+    return { success: true, templates: JSON.parse(content) };
+  } catch (err) {
+    return { success: false, error: err.message, templates: [] };
+  }
+});
+
+ipcMain.handle('templates:save', async (event, template) => {
+  try {
+    let templates = [];
+    if (fs.existsSync(TEMPLATES_FILE)) {
+      try { templates = JSON.parse(fs.readFileSync(TEMPLATES_FILE, 'utf8')); } catch (e) { templates = []; }
+    }
+    const idx = templates.findIndex(t => t.id === template.id || t.name.toLowerCase() === template.name.toLowerCase());
+    template.updatedAt = new Date().toISOString();
+    if (!template.id) template.id = 'tpl_' + Date.now();
+
+    if (idx >= 0) {
+      templates[idx] = template;
+    } else {
+      templates.push(template);
+    }
+    fs.writeFileSync(TEMPLATES_FILE, JSON.stringify(templates, null, 2), 'utf8');
+    return { success: true, templates, savedTemplate: template };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('templates:delete', async (event, templateId) => {
+  try {
+    if (!fs.existsSync(TEMPLATES_FILE)) return { success: true, templates: [] };
+    let templates = JSON.parse(fs.readFileSync(TEMPLATES_FILE, 'utf8'));
+    templates = templates.filter(t => t.id !== templateId);
+    fs.writeFileSync(TEMPLATES_FILE, JSON.stringify(templates, null, 2), 'utf8');
+    return { success: true, templates };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// ===========================================================================
+// IPC Handlers: Campaign History Logs
+// ===========================================================================
+ipcMain.handle('campaigns:list-history', async () => {
+  try {
+    const files = fs.readdirSync(__dirname)
+      .filter(f => f.startsWith('campaign_log_') && f.endsWith('.json'))
+      .map(f => {
+        const fullPath = path.join(__dirname, f);
+        const stat = fs.statSync(fullPath);
+        let itemCount = 0, sentCount = 0, failCount = 0, batchLabel = '';
+        try {
+          const content = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+          if (Array.isArray(content)) {
+            itemCount = content.length;
+            sentCount = content.filter(i => i.status === 'sent').length;
+            failCount = content.filter(i => i.status === 'failed').length;
+          }
+        } catch (e) { }
+
+        // Extract batch info from file name if present
+        const match = f.match(/campaign_log_(batch_\d+|error)_/);
+        if (match) batchLabel = match[1];
+
+        return {
+          fileName: f,
+          mtime: stat.mtimeMs,
+          dateStr: new Date(stat.mtimeMs).toLocaleString(),
+          batchLabel: batchLabel || 'Campaign',
+          total: itemCount,
+          sent: sentCount,
+          failed: failCount
+        };
+      })
+      .sort((a, b) => b.mtime - a.mtime);
+
+    return { success: true, logs: files };
+  } catch (err) {
+    return { success: false, error: err.message, logs: [] };
+  }
+});
+
+ipcMain.handle('campaigns:get-details', async (event, fileName) => {
+  try {
+    const safeName = path.basename(fileName);
+    const fullPath = path.join(__dirname, safeName);
+    if (!fs.existsSync(fullPath)) throw new Error('Log file not found');
+    const content = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+    return { success: true, fileName: safeName, data: content };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+
 

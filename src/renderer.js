@@ -1522,6 +1522,394 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => toast.remove(), 400);
     }, 5500);
   }
+
+  // ===========================================================================
+  // Phase 1 & Phase 2 Implementations: Jitter, Test Email, Preview, Templates, History
+  // ===========================================================================
+
+  // ── 1. Jitter Delay Controls ────────────────────────────────────────────────
+  const chkJitterDelay = document.getElementById('chkJitterDelay');
+  const jitterRangeBox = document.getElementById('jitterRangeBox');
+  const jitterMin = document.getElementById('jitterMin');
+  const jitterMax = document.getElementById('jitterMax');
+
+  if (chkJitterDelay && jitterRangeBox) {
+    chkJitterDelay.addEventListener('change', () => {
+      if (chkJitterDelay.checked) {
+        jitterRangeBox.classList.remove('hidden');
+      } else {
+        jitterRangeBox.classList.add('hidden');
+      }
+    });
+  }
+
+  // ── 2. Send Test Mail Modal ──────────────────────────────────────────────────
+  const btnOpenTestMailModal = document.getElementById('btnOpenTestMailModal');
+  const modalSendTest = document.getElementById('modalSendTest');
+  const btnCloseTestMailModal = document.getElementById('btnCloseTestMailModal');
+  const btnCancelTestMail = document.getElementById('btnCancelTestMail');
+  const btnSubmitSendTest = document.getElementById('btnSubmitSendTest');
+  const testMailRecipient = document.getElementById('testMailRecipient');
+  const testMailSubject = document.getElementById('testMailSubject');
+  const testMailFeedback = document.getElementById('testMailFeedback');
+
+  function openTestMailModal() {
+    if (modalSendTest) {
+      testMailFeedback.classList.add('hidden');
+      if (smtpUser && smtpUser.value) testMailRecipient.value = smtpUser.value;
+      modalSendTest.classList.remove('hidden');
+    }
+  }
+
+  function closeTestMailModal() {
+    if (modalSendTest) modalSendTest.classList.add('hidden');
+  }
+
+  if (btnOpenTestMailModal) btnOpenTestMailModal.addEventListener('click', openTestMailModal);
+  if (btnCloseTestMailModal) btnCloseTestMailModal.addEventListener('click', closeTestMailModal);
+  if (btnCancelTestMail) btnCancelTestMail.addEventListener('click', closeTestMailModal);
+
+  if (btnSubmitSendTest) {
+    btnSubmitSendTest.addEventListener('click', async () => {
+      const recipient = testMailRecipient.value.trim();
+      if (!recipient) {
+        testMailFeedback.textContent = 'Please enter a valid recipient email address.';
+        testMailFeedback.className = 'alert-box alert-error';
+        testMailFeedback.classList.remove('hidden');
+        return;
+      }
+
+      const smtpConfig = getSmtpConfig();
+      if (!smtpConfig.host || !smtpConfig.user || !smtpConfig.pass) {
+        testMailFeedback.textContent = 'Please fill out your SMTP Server, User, and Password first.';
+        testMailFeedback.className = 'alert-box alert-error';
+        testMailFeedback.classList.remove('hidden');
+        return;
+      }
+
+      btnSubmitSendTest.disabled = true;
+      btnSubmitSendTest.textContent = 'Sending...';
+
+      let sampleBody = 'This is a test email sent from AutoMail PRO to verify your SMTP connection and formatting.';
+      if (state.campaignLogs && state.campaignLogs.length > 0) {
+        sampleBody = state.campaignLogs[0].body || sampleBody;
+      }
+      const signatureText = emailSignature ? emailSignature.value : '';
+
+      const testPayload = {
+        smtpConfig,
+        mailData: {
+          to: recipient,
+          subject: testMailSubject.value.trim() || '[TEST] AutoMail PRO Verification',
+          body: sampleBody + (signatureText ? '\n\n' + signatureText : '')
+        }
+      };
+
+      const res = await window.electronAPI.sendSingleEmail(testPayload);
+      btnSubmitSendTest.disabled = false;
+      btnSubmitSendTest.textContent = 'Send Test Now';
+
+      if (res.success) {
+        testMailFeedback.textContent = '✓ Test email sent successfully to ' + recipient + '!';
+        testMailFeedback.className = 'alert-box alert-success';
+        testMailFeedback.classList.remove('hidden');
+      } else {
+        testMailFeedback.textContent = '❌ Failed: ' + res.error;
+        testMailFeedback.className = 'alert-box alert-error';
+        testMailFeedback.classList.remove('hidden');
+      }
+    });
+  }
+
+  // ── 3. Live Email Preview Modal ──────────────────────────────────────────────
+  const btnPreviewEmail = document.getElementById('btnPreviewEmail');
+  const modalEmailPreview = document.getElementById('modalEmailPreview');
+  const btnClosePreviewModal = document.getElementById('btnClosePreviewModal');
+  const btnClosePreviewModal2 = document.getElementById('btnClosePreviewModal2');
+  const btnPrevPreviewRow = document.getElementById('btnPrevPreviewRow');
+  const btnNextPreviewRow = document.getElementById('btnNextPreviewRow');
+  const previewRowText = document.getElementById('previewRowText');
+
+  const previewFrom = document.getElementById('previewFrom');
+  const previewTo = document.getElementById('previewTo');
+  const previewSubject = document.getElementById('previewSubject');
+  const previewBodyContainer = document.getElementById('previewBodyContainer');
+  const previewCcRow = document.getElementById('previewCcRow');
+  const previewCc = document.getElementById('previewCc');
+  const previewAttachRow = document.getElementById('previewAttachRow');
+  const previewAttachments = document.getElementById('previewAttachments');
+
+  let currentPreviewRowIndex = 0;
+
+  function renderPreviewRow(index) {
+    if (!state.campaignLogs || state.campaignLogs.length === 0) return;
+    if (index < 0) index = 0;
+    if (index >= state.campaignLogs.length) index = state.campaignLogs.length - 1;
+    currentPreviewRowIndex = index;
+
+    const item = state.campaignLogs[index];
+    previewRowText.textContent = `Row ${index + 1} of ${state.campaignLogs.length}`;
+
+    const senderName = smtpFromName.value.trim();
+    const senderEmail = smtpUser.value.trim() || 'user@domain.com';
+    previewFrom.textContent = senderName ? `${senderName} <${senderEmail}>` : senderEmail;
+
+    previewTo.textContent = item.recipientEmail || 'recipient@domain.com';
+    previewSubject.textContent = item.topic || '(No Subject)';
+
+    if (item.cc && String(item.cc).trim()) {
+      previewCc.textContent = item.cc;
+      previewCcRow.classList.remove('hidden');
+    } else {
+      previewCcRow.classList.add('hidden');
+    }
+
+    if (item.attachmentPath || state.globalAttachments.length > 0) {
+      const globalNames = state.globalAttachments.map(p => p.split(/[\\/]/).pop());
+      const itemAttach = item.attachmentPath ? [item.attachmentPath] : [];
+      const allAttach = [...itemAttach, ...globalNames].join(', ');
+      previewAttachments.textContent = allAttach;
+      previewAttachRow.classList.remove('hidden');
+    } else {
+      previewAttachRow.classList.add('hidden');
+    }
+
+    const sigText = emailSignature ? emailSignature.value : '';
+    let bodyText = item.body || '';
+    if (sigText.trim()) {
+      bodyText += '\n\n' + sigText;
+    }
+    previewBodyContainer.textContent = bodyText;
+  }
+
+  if (btnPreviewEmail) {
+    btnPreviewEmail.addEventListener('click', () => {
+      if (state.campaignLogs.length === 0) {
+        alert('Please load an Excel file first.');
+        return;
+      }
+      renderPreviewRow(0);
+      modalEmailPreview.classList.remove('hidden');
+    });
+  }
+
+  if (btnClosePreviewModal) btnClosePreviewModal.addEventListener('click', () => modalEmailPreview.classList.add('hidden'));
+  if (btnClosePreviewModal2) btnClosePreviewModal2.addEventListener('click', () => modalEmailPreview.classList.add('hidden'));
+
+  if (btnPrevPreviewRow) {
+    btnPrevPreviewRow.addEventListener('click', () => {
+      renderPreviewRow(currentPreviewRowIndex - 1);
+    });
+  }
+
+  if (btnNextPreviewRow) {
+    btnNextPreviewRow.addEventListener('click', () => {
+      renderPreviewRow(currentPreviewRowIndex + 1);
+    });
+  }
+
+  // Update preview button state whenever campaignLogs update
+  const origUpdateStartButtonState = updateStartButtonState;
+  updateStartButtonState = function() {
+    origUpdateStartButtonState();
+    if (btnPreviewEmail) {
+      btnPreviewEmail.disabled = state.campaignLogs.length === 0;
+    }
+  };
+
+  // ── 4. Email Templates System ────────────────────────────────────────────────
+  const templateSelect = document.getElementById('templateSelect');
+  const btnOpenSaveTemplateModal = document.getElementById('btnOpenSaveTemplateModal');
+  const btnDeleteTemplate = document.getElementById('btnDeleteTemplate');
+  const modalSaveTemplate = document.getElementById('modalSaveTemplate');
+  const btnCloseSaveTemplateModal = document.getElementById('btnCloseSaveTemplateModal');
+  const btnCancelSaveTemplate = document.getElementById('btnCancelSaveTemplate');
+  const btnConfirmSaveTemplate = document.getElementById('btnConfirmSaveTemplate');
+  const templateNameInput = document.getElementById('templateNameInput');
+
+  let savedTemplatesList = [];
+
+  async function loadTemplatesDropdown() {
+    if (!templateSelect) return;
+    const res = await window.electronAPI.loadTemplates();
+    if (res.success && Array.isArray(res.templates)) {
+      savedTemplatesList = res.templates;
+      templateSelect.innerHTML = '<option value="">-- Custom / Default --</option>';
+      res.templates.forEach(tpl => {
+        const opt = document.createElement('option');
+        opt.value = tpl.id;
+        opt.textContent = tpl.name;
+        templateSelect.appendChild(opt);
+      });
+    }
+  }
+  loadTemplatesDropdown();
+
+  if (templateSelect) {
+    templateSelect.addEventListener('change', () => {
+      const selectedId = templateSelect.value;
+      if (!selectedId) {
+        if (btnDeleteTemplate) btnDeleteTemplate.classList.add('hidden');
+        return;
+      }
+      if (btnDeleteTemplate) btnDeleteTemplate.classList.remove('hidden');
+      const tpl = savedTemplatesList.find(t => t.id === selectedId);
+      if (tpl && tpl.mappings) {
+        if (tpl.mappings.email && mapEmail) mapEmail.value = tpl.mappings.email;
+        if (tpl.mappings.topic && mapTopic) mapTopic.value = tpl.mappings.topic;
+        if (tpl.mappings.body && mapBody) mapBody.value = tpl.mappings.body;
+        if (tpl.mappings.cc && mapCc) mapCc.value = tpl.mappings.cc;
+        if (tpl.mappings.bcc && mapBcc) mapBcc.value = tpl.mappings.bcc;
+        if (tpl.mappings.attachment && mapAttachment) mapAttachment.value = tpl.mappings.attachment;
+        if (tpl.signature && emailSignature) emailSignature.value = tpl.signature;
+        generateLogsFromMapping();
+      }
+    });
+  }
+
+  if (btnOpenSaveTemplateModal) {
+    btnOpenSaveTemplateModal.addEventListener('click', () => {
+      if (templateNameInput) templateNameInput.value = '';
+      if (modalSaveTemplate) modalSaveTemplate.classList.remove('hidden');
+    });
+  }
+
+  if (btnCloseSaveTemplateModal) btnCloseSaveTemplateModal.addEventListener('click', () => modalSaveTemplate.classList.add('hidden'));
+  if (btnCancelSaveTemplate) btnCancelSaveTemplate.addEventListener('click', () => modalSaveTemplate.classList.add('hidden'));
+
+  if (btnConfirmSaveTemplate) {
+    btnConfirmSaveTemplate.addEventListener('click', async () => {
+      const name = templateNameInput.value.trim();
+      if (!name) { alert('Please enter a template name.'); return; }
+
+      const tplData = {
+        name,
+        mappings: {
+          email: mapEmail ? mapEmail.value : '',
+          topic: mapTopic ? mapTopic.value : '',
+          body: mapBody ? mapBody.value : '',
+          cc: mapCc ? mapCc.value : '',
+          bcc: mapBcc ? mapBcc.value : '',
+          attachment: mapAttachment ? mapAttachment.value : ''
+        },
+        signature: emailSignature ? emailSignature.value : ''
+      };
+
+      const res = await window.electronAPI.saveTemplate(tplData);
+      if (res.success) {
+        modalSaveTemplate.classList.add('hidden');
+        await loadTemplatesDropdown();
+        if (res.savedTemplate && templateSelect) {
+          templateSelect.value = res.savedTemplate.id;
+          if (btnDeleteTemplate) btnDeleteTemplate.classList.remove('hidden');
+        }
+        showScheduleToast('✓ Template saved successfully!');
+      } else {
+        alert('Failed to save template: ' + res.error);
+      }
+    });
+  }
+
+  if (btnDeleteTemplate) {
+    btnDeleteTemplate.addEventListener('click', async () => {
+      const selectedId = templateSelect.value;
+      if (!selectedId) return;
+      if (!confirm('Are you sure you want to delete this template?')) return;
+      const res = await window.electronAPI.deleteTemplate(selectedId);
+      if (res.success) {
+        btnDeleteTemplate.classList.add('hidden');
+        await loadTemplatesDropdown();
+        showScheduleToast('Template deleted.');
+      }
+    });
+  }
+
+  // ── 5. Campaign History Drawer ─────────────────────────────────────────────
+  const btnOpenHistoryDrawer = document.getElementById('btnOpenHistoryDrawer');
+  const drawerHistory = document.getElementById('drawerHistory');
+  const btnCloseHistoryDrawer = document.getElementById('btnCloseHistoryDrawer');
+  const btnRefreshHistory = document.getElementById('btnRefreshHistory');
+  const historyLogList = document.getElementById('historyLogList');
+  const historyLogCountText = document.getElementById('historyLogCountText');
+  const historyDetailsBox = document.getElementById('historyDetailsBox');
+  const historyDetailsTitle = document.getElementById('historyDetailsTitle');
+  const historyDetailsSummary = document.getElementById('historyDetailsSummary');
+  const historyDetailsTableBody = document.getElementById('historyDetailsTableBody');
+  const btnCloseHistoryDetails = document.getElementById('btnCloseHistoryDetails');
+
+  async function fetchCampaignHistory() {
+    if (!historyLogList) return;
+    historyLogCountText.textContent = 'Loading logs...';
+    historyLogList.innerHTML = '';
+    const res = await window.electronAPI.listHistoryLogs();
+    if (res.success && Array.isArray(res.logs)) {
+      historyLogCountText.textContent = `${res.logs.length} Campaign logs found`;
+      if (res.logs.length === 0) {
+        historyLogList.innerHTML = '<div style="font-size:0.8rem; color:var(--text-secondary); text-align:center; padding:20px;">No past campaign logs available yet.</div>';
+        return;
+      }
+      res.logs.forEach(log => {
+        const item = document.createElement('div');
+        item.className = 'history-log-item';
+        item.innerHTML = `
+          <div>
+            <div class="history-log-title">${log.batchLabel} — <span style="font-weight:normal; font-size:0.78rem; color:var(--text-secondary);">${log.dateStr}</span></div>
+            <div class="history-log-date" style="margin-top:2px;">File: <code>${log.fileName}</code></div>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <span class="history-stat-badge sent">${log.sent} Sent</span>
+            ${log.failed > 0 ? `<span class="history-stat-badge failed">${log.failed} Failed</span>` : ''}
+          </div>
+        `;
+        item.addEventListener('click', () => openHistoryLogDetails(log.fileName));
+        historyLogList.appendChild(item);
+      });
+    } else {
+      historyLogCountText.textContent = 'Error loading campaign history.';
+    }
+  }
+
+  async function openHistoryLogDetails(fileName) {
+    if (!historyDetailsBox) return;
+    const res = await window.electronAPI.getHistoryDetails(fileName);
+    if (res.success && Array.isArray(res.data)) {
+      historyDetailsTitle.textContent = `Log Details: ${fileName}`;
+      const sent = res.data.filter(i => i.status === 'sent').length;
+      const failed = res.data.filter(i => i.status === 'failed').length;
+      historyDetailsSummary.innerHTML = `
+        <span>Total: <strong>${res.data.length}</strong></span>
+        <span style="color:#34d399;">Sent: <strong>${sent}</strong></span>
+        <span style="color:#f87171;">Failed: <strong>${failed}</strong></span>
+      `;
+
+      historyDetailsTableBody.innerHTML = '';
+      res.data.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+        tr.innerHTML = `
+          <td style="padding: 6px; color: var(--text-primary);">${row.recipientEmail || '-'}</td>
+          <td style="padding: 6px;">
+            <span class="badge ${row.status === 'sent' ? 'badge-sent' : 'badge-failed'}">${row.status || 'unknown'}</span>
+          </td>
+          <td style="padding: 6px; font-size: 0.7rem; color: var(--text-secondary);">${row.error || row.sentTime || '-'}</td>
+        `;
+        historyDetailsTableBody.appendChild(tr);
+      });
+      historyDetailsBox.classList.remove('hidden');
+    }
+  }
+
+  if (btnOpenHistoryDrawer) {
+    btnOpenHistoryDrawer.addEventListener('click', () => {
+      fetchCampaignHistory();
+      if (drawerHistory) drawerHistory.classList.remove('hidden');
+    });
+  }
+
+  if (btnCloseHistoryDrawer) btnCloseHistoryDrawer.addEventListener('click', () => drawerHistory.classList.add('hidden'));
+  if (btnRefreshHistory) btnRefreshHistory.addEventListener('click', fetchCampaignHistory);
+  if (btnCloseHistoryDetails) btnCloseHistoryDetails.addEventListener('click', () => historyDetailsBox.classList.add('hidden'));
 });
+
 
 

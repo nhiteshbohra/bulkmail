@@ -22,6 +22,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Signature file synchronization
   loadSignatureFile:  () => ipcRenderer.invoke('signature:load'),
   saveSignatureFile:  (sig) => ipcRenderer.invoke('signature:save', sig),
+  // Templates & Campaign History (Phase 1 & 2)
+  sendSingleEmail:    (payload) => ipcRenderer.invoke('smtp:send-email', payload),
+  loadTemplates:      () => ipcRenderer.invoke('templates:load'),
+  saveTemplate:       (template) => ipcRenderer.invoke('templates:save', template),
+  deleteTemplate:     (id) => ipcRenderer.invoke('templates:delete', id),
+  listHistoryLogs:    () => ipcRenderer.invoke('campaigns:list-history'),
+  getHistoryDetails:  (fileName) => ipcRenderer.invoke('campaigns:get-details', fileName),
 });
+
 
 

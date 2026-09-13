@@ -1,13 +1,15 @@
-# 📧 AutoMail Pro - Bulk Email Dispatcher
+# 📧 AutoMail PRO - Enterprise Bulk Email Dispatcher
 > **Made with ❤️ by Hitesh Bohra**
 
-[![Electron](https://img.shields.io/badge/Electron-29.1.0-47848F?style=for-the-badge&logo=electron&logoColor=white)](https://electronjs.org/)
+[![Electron](https://img.shields.io/badge/Electron-44.3.0-47848F?style=for-the-badge&logo=electron&logoColor=white)](https://electronjs.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-v18%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Nodemailer](https://img.shields.io/badge/Nodemailer-6.9.13-007ACC?style=for-the-badge&logo=nodemailer&logoColor=white)](https://nodemailer.com/)
-[![SheetJS](https://img.shields.io/badge/SheetJS-0.18.5-217346?style=for-the-badge&logo=microsoft-excel&logoColor=white)](https://sheetjs.com/)
+[![Nodemailer](https://img.shields.io/badge/Nodemailer-10.0.9-007ACC?style=for-the-badge&logo=nodemailer&logoColor=white)](https://nodemailer.com/)
+[![SheetJS](https://img.shields.io/badge/SheetJS-0.20.3-217346?style=for-the-badge&logo=microsoft-excel&logoColor=white)](https://sheetjs.com/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg?style=for-the-badge)](https://opensource.org/licenses/ISC)
 
-**AutoMail Pro** is a sleek, modern desktop application built with **Electron**, **Nodemailer**, and **SheetJS (XLSX)** that automates sending personalized bulk emails, CC/BCC recipients, and attachments directly from your Excel (`.xlsx`, `.xls`) or CSV files. Created by **Hitesh Bohra**.
+**AutoMail PRO** is a feature-rich, high-performance desktop application built with **Electron**, **Nodemailer**, and **SheetJS (XLSX)** that automates sending personalized bulk emails directly from Excel (`.xlsx`, `.xls`) or CSV spreadsheets. 
+
+Equipped with **Windows Task Scheduler integration**, **Shield Quota MX domain verification**, **Randomized Jitter Delays**, **Live Email Preview**, and **Campaign History Tracking**, AutoMail PRO ensures maximum deliverability and workflow efficiency.
 
 ---
 
@@ -17,18 +19,27 @@
 
 ---
 
-## ✨ Features
+## ✨ Features & Highlights
 
-- 📄 **Universal Spreadsheet Support**: Read and process `.xlsx`, `.xls`, and `.csv` files seamlessly.
-- ⚡ **Auto & Custom Column Mapping**: Automatic smart column detection with full manual override mapping for `Email Address`, `Subject / Topic`, `Email Body`, and `Attachment Path`.
-- 👥 **Multi-Recipient Support**: Send emails to multiple recipients per row (separated by commas `,` or semicolons `;`).
-- ⚡ **Quick SMTP Presets**: Pre-configured SMTP settings for **Gmail / Google Workspace**, **Outlook / Office 365**, **Yahoo Mail**, or **Custom SMTP Servers**.
-- 🧪 **Live Connection Test**: Verify SMTP host, port, and authentication credentials before launching campaigns.
-- 📎 **Personalized Dynamic Attachments**: Attach custom files per row by specifying local file paths in your Excel sheet.
-- ⏱️ **Rate Limit & Anti-Spam Controls**: Customizable inter-email delay (milliseconds) to respect mail server throttling limits and avoid spam flags.
-- 📊 **Real-Time Progress Tracking**: Live status monitor showing total contacts, sent/failed counts, progress bar, and real-time execution logs.
-- 📁 **Campaign Execution Export**: Export detailed execution reports (status, response, timestamp, error logs) back into an Excel (`.xlsx`) or `.csv` file.
-- 🧪 **Sample Data Generator**: Includes a built-in helper script (`create_sample_excel.js`) to generate sample test data instantly.
+### 🚀 Automation & Scheduling
+- ⏰ **Fire-and-Forget Multi-Day Batch Scheduler**: Automatically split large campaigns into safe daily batches (e.g. max 500 emails/day on weekdays) integrated with **Windows Task Scheduler (`schtasks`)**—emails send on schedule even if the desktop app is closed!
+- 🎲 **Randomized Jitter Delay (Anti-Spam Safeguard)**: Configure randomized delay ranges (e.g. 2s to 6s randomly per email) to simulate human sending patterns and bypass spam filters.
+- 📩 **Send Test Mail to Myself**: Dispatch a quick test email to your inbox to verify formatting, attachments, and SMTP deliverability before launching full campaigns.
+
+### 🛡️ Deliverability & Validation
+- 🛡️ **Shield Quota Pre-Flight Email Verification**: Automatically scan recipient email addresses for invalid syntax and inactive/dead domain MX records before dispatching, saving your daily Gmail/SMTP sending quota.
+- 👥 **Multi-Recipient Cell Splitting**: Automatically split cells containing multiple comma- or semicolon-separated email addresses into individual recipients.
+- 🔗 **Clickable HTML Signature Links**: Automatic markdown link parsing (e.g., `[LinkedIn](url)`), email addresses, and phone numbers in signatures into clickable HTML hyperlinks.
+
+### 📄 Composition, Templates & Preview
+- 🔍 **Live Rendered Email Preview Modal**: Inspect exactly how emails will look for any row in your spreadsheet with `{VARIABLE}` interpolation, signature rendering, and attachment verification.
+- 💾 **Reusable Email Templates System**: Save, load, and delete email mapping presets and signature templates stored locally (`templates.json`).
+- 📎 **Global Master Attachments**: Attach master files/images to all outgoing emails alongside row-specific attachment file paths.
+
+### 📊 Monitoring, Logs & Analytics
+- 📜 **Past Campaign History Slide-Over Drawer**: Slide-over panel to view, search, inspect recipient tables, and re-export reports for all historical campaign logs (`campaign_log_*.json`).
+- 📊 **Real-Time Execution Dashboard**: Live metrics showing Total, Sent, Failed, Quota Saved, and Pending counters with search/filtering (`All`, `Sent`, `Failed`, `Invalid`, `Pending`).
+- 📁 **Campaign Execution Export**: Export detailed execution reports (status, response, timestamp, error logs) into Excel (`.xlsx`) or CSV files.
 
 ---
 
@@ -38,7 +49,7 @@ Before running the application, make sure you have the following installed:
 
 - **Node.js**: `v18.0.0` or higher ([Download Node.js](https://nodejs.org/))
 - **npm**: `v9.0.0` or higher (comes bundled with Node.js)
-- **Git**: ([Download Git](https://git-scm.com/))
+- **Windows OS**: Recommended for native `schtasks` background scheduling
 
 ---
 
@@ -65,7 +76,7 @@ To test the application immediately with sample data, run:
 node create_sample_excel.js
 ```
 
-This creates a `sample_contacts.xlsx` file in the project folder with pre-filled test columns.
+This creates `sample_contacts.xlsx` in the project folder with pre-filled test columns.
 
 ### 4. Launch the Application
 
@@ -77,19 +88,19 @@ npm start
 
 ## 📋 Excel / CSV Format Guide
 
-AutoMail Excel can automatically detect your sheet headers, or you can map any column names manually in the UI.
+AutoMail PRO automatically detects sheet headers or lets you map column names manually in the UI.
 
 ### Recommended Column Structure
 
-| EMAIL ADDRESS | TOPIC | BODY | ATTACHMENT PATH |
-| :--- | :--- | :--- | :--- |
-| `john.doe@example.com, tech@example.com` | `Monthly Performance Update` | `Dear John,\n\nPlease see attached report.` | `C:\Documents\Report.pdf` |
-| `alice.smith@example.com` | `Welcome to the Team!` | `Hello Alice,\n\nWelcome aboard!` | `C:\Documents\Onboarding.pdf` |
+| EMAIL ADDRESS | TOPIC | BODY | CC | ATTACHMENT PATH |
+| :--- | :--- | :--- | :--- | :--- |
+| `john.doe@example.com` | `Monthly Report - {FIRST_NAME}` | `Dear {FIRST_NAME},\n\nPlease see attached report for {COMPANY}.` | `manager@example.com` | `C:\Documents\Report.pdf` |
+| `alice.smith@example.com` | `Welcome to the Team!` | `Hello Alice,\n\nWelcome aboard!` | | `C:\Documents\Onboarding.pdf` |
 
-> 💡 **Tips:**
+> 💡 **Pro Tips:**
+> - Use placeholders like `{FIRST_NAME}`, `{COMPANY}`, etc., in your subject or body—they will be interpolated per recipient!
 > - Multiple email addresses in one cell can be separated with commas (`,`) or semicolons (`;`).
-> - The `ATTACHMENT PATH` field is optional. Leave it empty if no attachment is required for that row.
-> - Plain text line breaks (`\n`) will be automatically formatted for email rendering.
+> - The `ATTACHMENT PATH` field is optional. Leave empty if no individual attachment is required.
 
 ---
 
@@ -104,7 +115,7 @@ AutoMail Excel can automatically detect your sheet headers, or you can map any c
   > 1. Go to your [Google Account Security Settings](https://myaccount.google.com/security).
   > 2. Enable **2-Step Verification**.
   > 3. Search for **App Passwords** in the search bar.
-  > 4. Create an App Password for **Mail** and copy the 16-character password into the app.
+  > 4. Create an App Password for **Mail** and paste the 16-character password into AutoMail PRO.
 
 ### 2. Outlook / Office 365 Setup
 - **Host**: `smtp.office365.com`
@@ -113,7 +124,7 @@ AutoMail Excel can automatically detect your sheet headers, or you can map any c
 - **Password**: Your account password or App Password
 
 ### 3. Custom SMTP
-- Enter your SMTP server details, port, username, password, and SSL/TLS toggles as provided by your email service provider or hosting administrator.
+- Enter your SMTP server host, port, username, password, and SSL/TLS toggle as provided by your email host.
 
 ---
 
@@ -121,14 +132,17 @@ AutoMail Excel can automatically detect your sheet headers, or you can map any c
 
 ```text
 bulkmail/
-├── main.js                  # Electron main process (IPC handlers, file parsing, SMTP engine)
-├── preload.js               # Context bridge exposure for secure IPC communication
+├── main.js                  # Electron main process (IPC handlers, file parsing, SMTP & schedule tasks)
+├── sender.js                # Standalone background mail dispatcher (Windows Scheduled Task entrypoint)
+├── preload.js               # Context bridge bindings for secure IPC communication
+├── emailValidator.js        # Email syntax and MX domain validation module
 ├── create_sample_excel.js   # Helper script to generate sample Excel contacts
 ├── package.json             # App metadata, dependencies, and npm scripts
-├── .gitignore               # Git ignore rules
+├── run_schedule.bat         # Launcher script generated for Windows Task Scheduler
 └── src/
-    ├── index.html           # Desktop UI structure & dynamic forms
-    └── styles.css           # Glassmorphism dark mode UI styling
+    ├── index.html           # UI structure, dynamic forms, modals & slide-over drawer
+    ├── styles.css           # Glassmorphism dark mode UI styling & animations
+    └── renderer.js          # Application logic, preview renderer, template manager & log drawer
 ```
 
 ---
@@ -142,28 +156,6 @@ bulkmail/
 
 ---
 
-## ❓ FAQ & Troubleshooting
-
-<details>
-<summary><b>1. Error: 535 5.7.8 Error: authentication failed</b></summary>
-<br>
-This happens when using a normal account password instead of an <b>App Password</b> (especially for Gmail and Yahoo). Please follow the Google App Password instructions above to generate a 16-digit passcode.
-</details>
-
-<details>
-<summary><b>2. Attachment file not found error</b></summary>
-<br>
-Make sure the full path specified in your Excel sheet exists on your computer (e.g. <code>C:\Users\Name\Documents\file.pdf</code>).
-</details>
-
-<details>
-<summary><b>3. Is my email password stored anywhere?</b></summary>
-<br>
-<b>No.</b> Credentials are only kept in application memory for the duration of the current session and sent directly to your configured SMTP server over secure sockets.
-</details>
-
----
-
 ## 📜 License
 
 This project is licensed under the [ISC License](LICENSE).
@@ -174,4 +166,4 @@ This project is licensed under the [ISC License](LICENSE).
 
 Developed by **[Hitesh Bohra](https://github.com/nhiteshbohra)**.
 
-Feel free to ⭐ **Star** this repository if you find it helpful!
+⭐ **Star** this repository if you find it helpful!

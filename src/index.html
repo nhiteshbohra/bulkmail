@@ -23,7 +23,11 @@
           <p>Automated Email Dispatcher from Excel Spreadsheets &bull; Made by <strong>Hitesh Bohra</strong></p>
         </div>
       </div>
-      <div class="header-actions">
+      <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
+        <button id="btnOpenHistoryDrawer" class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 6px 12px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+          📜 Campaign History
+        </button>
         <div id="smtpStatusBadge" class="status-indicator disconnected">
           <span class="dot"></span>
           <span class="text">SMTP: Not Verified</span>
@@ -102,10 +106,14 @@
                 </div>
               </div>
 
-              <div class="card-footer">
+              <div class="card-footer" style="display: flex; gap: 8px;">
                 <button id="btnTestSmtp" class="btn btn-secondary">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                   Test Connection
+                </button>
+                <button id="btnOpenTestMailModal" class="btn btn-outline" style="display: flex; align-items: center; gap: 6px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  Send Test Mail
                 </button>
               </div>
             </div>
@@ -142,9 +150,33 @@
               <button id="btnRemoveFile" class="btn-icon" title="Remove file">&times;</button>
             </div>
 
+            <!-- Template Toolbar -->
+            <div class="template-toolbar" style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-card); border-radius: var(--radius-sm); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 180px;">
+                <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);">Template:</span>
+                <select id="templateSelect" class="select-highlight" style="flex: 1; font-size: 0.8rem; padding: 5px 8px;">
+                  <option value="">-- Custom / Default --</option>
+                </select>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button id="btnOpenSaveTemplateModal" type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 5px 10px;" title="Save current template">
+                  💾 Save Template
+                </button>
+                <button id="btnDeleteTemplate" type="button" class="btn btn-outline btn-sm hidden" style="font-size: 0.75rem; padding: 5px 8px; color: var(--accent-red);" title="Delete selected template">
+                  🗑️
+                </button>
+              </div>
+            </div>
+
             <!-- Mapping Controls -->
             <div id="mappingSection" class="mapping-section hidden">
-              <div class="section-subtitle">Map Columns to Email Fields</div>
+              <div class="section-subtitle" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Map Columns to Email Fields</span>
+                <button id="btnPreviewEmail" type="button" class="btn btn-accent btn-sm" style="display: flex; align-items: center; gap: 6px; font-size: 0.78rem; padding: 4px 10px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Preview Rendered Email
+                </button>
+              </div>
 
               <div class="form-group">
                 <label for="mapEmail">Recipient Email Address Column <span class="required">*</span></label>
@@ -220,12 +252,23 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 3. Automation Controls
               </h2>
-              <div class="delay-setting">
-                <label for="emailDelay">Delay per Email:</label>
-                <input type="number" id="emailDelay" min="0" max="60" value="2">
-                <span class="unit">sec</span>
+              <div class="delay-setting-wrapper" style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                <div class="delay-setting">
+                  <label for="emailDelay">Delay per Email:</label>
+                  <input type="number" id="emailDelay" min="0" max="60" value="2">
+                  <span class="unit">sec</span>
+                </div>
+                <div class="jitter-setting" style="display: flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--text-secondary);">
+                  <input type="checkbox" id="chkJitterDelay">
+                  <label for="chkJitterDelay" style="cursor: pointer;" title="Randomize delay between min and max range to avoid spam filters">Random Jitter</label>
+                  <span id="jitterRangeBox" class="hidden" style="display: inline-flex; align-items: center; gap: 3px;">
+                    (<input type="number" id="jitterMin" value="2" min="1" max="60" style="width: 36px; font-size: 0.7rem; padding: 1px 3px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-card); color: var(--text-primary); border-radius: 4px;"> to
+                    <input type="number" id="jitterMax" value="6" min="1" max="60" style="width: 36px; font-size: 0.7rem; padding: 1px 3px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-card); color: var(--text-primary); border-radius: 4px;">s)
+                  </span>
+                </div>
               </div>
             </div>
+
 
             <!-- Progress Bar -->
             <div class="progress-section">
@@ -475,6 +518,139 @@
     </main>
   </div>
 
+  <!-- Modal 1: Send Test Email -->
+  <div id="modalSendTest" class="modal-overlay hidden">
+    <div class="modal-content glass-panel" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>📩 Send Test Email</h3>
+        <button id="btnCloseTestMailModal" class="btn-icon">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+        <p style="font-size: 0.82rem; color: var(--text-secondary);">
+          Dispatch a single test email to your inbox to check design, formatting, clickable signature links, and deliverability.
+        </p>
+        <div class="form-group">
+          <label for="testMailRecipient">Recipient Email Address <span class="required">*</span></label>
+          <input type="email" id="testMailRecipient" placeholder="your.personal@email.com">
+        </div>
+        <div class="form-group">
+          <label for="testMailSubject">Subject</label>
+          <input type="text" id="testMailSubject" placeholder="[TEST] Campaign Subject Check">
+        </div>
+        <div id="testMailFeedback" class="alert-box hidden"></div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+        <button id="btnCancelTestMail" class="btn btn-outline btn-sm">Cancel</button>
+        <button id="btnSubmitSendTest" class="btn btn-primary btn-sm">Send Test Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Live Email Preview -->
+  <div id="modalEmailPreview" class="modal-overlay hidden">
+    <div class="modal-content glass-panel" style="max-width: 720px; width: 90%;">
+      <div class="modal-header">
+        <h3>🔍 Live Rendered Email Preview</h3>
+        <button id="btnClosePreviewModal" class="btn-icon">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+        <div class="preview-nav-bar" style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-card);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button id="btnPrevPreviewRow" class="btn btn-outline btn-sm" style="padding: 3px 8px;">&larr; Prev Row</button>
+            <span id="previewRowText" style="font-size: 0.8rem; font-weight: 500; color: var(--text-primary);">Row 1 of 0</span>
+            <button id="btnNextPreviewRow" class="btn btn-outline btn-sm" style="padding: 3px 8px;">Next Row &rarr;</button>
+          </div>
+          <span style="font-size: 0.72rem; color: #34d399;">✓ Variables Interpolated</span>
+        </div>
+
+        <div class="email-mockup-client" style="background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-card); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+          <div class="mockup-meta" style="font-size: 0.82rem; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid var(--border-card); padding-bottom: 10px;">
+            <div><strong style="color: var(--text-secondary);">From:</strong> <span id="previewFrom">Sender &lt;user@example.com&gt;</span></div>
+            <div><strong style="color: var(--text-secondary);">To:</strong> <span id="previewTo" style="color: #60a5fa; font-weight: 500;">recipient@domain.com</span></div>
+            <div id="previewCcRow" class="hidden"><strong style="color: var(--text-secondary);">CC:</strong> <span id="previewCc"></span></div>
+            <div><strong style="color: var(--text-secondary);">Subject:</strong> <span id="previewSubject" style="color: #f3f4f6; font-weight: 600;">Subject line</span></div>
+            <div id="previewAttachRow" class="hidden"><strong style="color: var(--text-secondary);">Attachments:</strong> <span id="previewAttachments" style="color: #fbbf24; font-size: 0.78rem;"></span></div>
+          </div>
+
+          <div id="previewBodyContainer" class="mockup-body" style="min-height: 180px; max-height: 320px; overflow-y: auto; background: rgba(0,0,0,0.25); border-radius: 6px; padding: 12px; font-size: 0.85rem; line-height: 1.6; color: #e2e8f0; white-space: pre-wrap; font-family: inherit;">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; margin-top: 14px;">
+        <button id="btnClosePreviewModal2" class="btn btn-secondary btn-sm">Close Preview</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Save Template -->
+  <div id="modalSaveTemplate" class="modal-overlay hidden">
+    <div class="modal-content glass-panel" style="max-width: 420px;">
+      <div class="modal-header">
+        <h3>💾 Save Template</h3>
+        <button id="btnCloseSaveTemplateModal" class="btn-icon">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+        <div class="form-group">
+          <label for="templateNameInput">Template Name <span class="required">*</span></label>
+          <input type="text" id="templateNameInput" placeholder="e.g. Cold Outreach Batch V1">
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-secondary);">
+          This will save your current column mapping selections and signature format for quick future reuse.
+        </p>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+        <button id="btnCancelSaveTemplate" class="btn btn-outline btn-sm">Cancel</button>
+        <button id="btnConfirmSaveTemplate" class="btn btn-primary btn-sm">Save Template</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide-Over Drawer: Past Campaign History -->
+  <div id="drawerHistory" class="drawer-overlay hidden">
+    <div class="drawer-panel glass-panel">
+      <div class="drawer-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border-card);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+          <h2 style="margin: 0; font-size: 1.1rem;">Past Campaign History</h2>
+        </div>
+        <button id="btnCloseHistoryDrawer" class="btn-icon">&times;</button>
+      </div>
+
+      <div class="drawer-body" style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; max-height: calc(100vh - 120px);">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span id="historyLogCountText" style="font-size: 0.8rem; color: var(--text-secondary);">Loading logs...</span>
+          <button id="btnRefreshHistory" class="btn btn-outline btn-sm" style="font-size: 0.75rem; padding: 3px 8px;">Refresh</button>
+        </div>
+
+        <div id="historyLogList" class="history-log-list" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- History log items populated dynamically -->
+        </div>
+
+        <!-- History Log Details Sub-Panel -->
+        <div id="historyDetailsBox" class="history-details-box hidden" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-card); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong id="historyDetailsTitle" style="font-size: 0.85rem; color: var(--text-primary);">Campaign Log Details</strong>
+            <button id="btnCloseHistoryDetails" class="text-btn" style="font-size: 0.75rem; color: var(--text-secondary); background: none; border: none; cursor: pointer;">Close Details</button>
+          </div>
+          <div id="historyDetailsSummary" style="font-size: 0.78rem; color: var(--text-secondary); display: flex; gap: 12px;"></div>
+          <div style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-card); border-radius: 6px;">
+            <table style="width: 100%; font-size: 0.75rem; border-collapse: collapse;">
+              <thead>
+                <tr style="background: rgba(255,255,255,0.05); text-align: left;">
+                  <th style="padding: 6px;">Recipient</th>
+                  <th style="padding: 6px;">Status</th>
+                  <th style="padding: 6px;">Error / Info</th>
+                </tr>
+              </thead>
+              <tbody id="historyDetailsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="renderer.js"></script>
 </body>
 </html>
+

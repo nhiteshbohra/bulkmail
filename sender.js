@@ -106,7 +106,7 @@ async function run() {
     return;
   }
 
-  const { smtpConfig, emailDelay = 0 } = data;
+  const { smtpConfig, emailDelay = 0, useJitter = false, minDelay = 2, maxDelay = 6 } = data;
   if (!smtpConfig) {
     console.error('[AutoMail] Missing SMTP configuration. Aborting.');
     try { fs.unlinkSync(LOCK_FILE); } catch (e) { }
@@ -230,9 +230,20 @@ async function run() {
       console.log(prefix, 'Sent ->', item.recipientEmail);
       results.push({ ...item });
 
-      if (emailDelay > 0 && i < itemsToSend.length - 1) {
-        await sleep(emailDelay * 1000);
+      if (i < itemsToSend.length - 1) {
+        let delaySec = parseInt(emailDelay, 10) || 0;
+        if (useJitter) {
+          const minSec = parseInt(minDelay, 10) || 1;
+          const maxSec = parseInt(maxDelay, 10) || 5;
+          if (maxSec >= minSec) {
+            delaySec = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
+          }
+        }
+        if (delaySec > 0) {
+          await sleep(delaySec * 1000);
+        }
       }
+
     } catch (err) {
       fail++;
       item.status = 'failed';
