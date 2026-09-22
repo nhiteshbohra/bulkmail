@@ -56,3 +56,7 @@ desktop.ini
 *.ntvs*
 *.njsproj
 *.sublime-workspace
+
+# 10. Personal Application Content (Cold Email Templates & Resume)
+BODY.txt
+Siddhika Rathore.pdf

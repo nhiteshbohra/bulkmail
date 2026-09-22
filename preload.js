@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Signature file synchronization
   loadSignatureFile:  () => ipcRenderer.invoke('signature:load'),
   saveSignatureFile:  (sig) => ipcRenderer.invoke('signature:save', sig),
+  // Subject/Body template file (BODY.txt) synchronization
+  loadBodyTemplateFile: () => ipcRenderer.invoke('bodyTemplate:load'),
   // Templates & Campaign History (Phase 1 & 2)
   sendSingleEmail:    (payload) => ipcRenderer.invoke('smtp:send-email', payload),
   loadTemplates:      () => ipcRenderer.invoke('templates:load'),

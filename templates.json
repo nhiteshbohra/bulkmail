@@ -1,12 +1,1 @@
-[
-  {
-    "id": "test_1",
-    "name": "Cold Email V1",
-    "mappings": {
-      "email": "Email",
-      "topic": "Subject",
-      "body": "Body"
-    },
-    "signature": "-- Best"
-  }
-]
+[]

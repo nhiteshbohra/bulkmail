@@ -265,9 +265,21 @@ ipcMain.handle('schedule:save', async (event, scheduleData) => {
 
 ipcMain.handle('schedule:load', async () => {
   try {
-    if (!fs.existsSync(SCHEDULE_FILE)) return { success: true, data: null };
-    const raw = fs.readFileSync(SCHEDULE_FILE, 'utf8');
-    return { success: true, data: JSON.parse(raw) };
+    if (fs.existsSync(SCHEDULE_FILE)) {
+      const raw = fs.readFileSync(SCHEDULE_FILE, 'utf8');
+      return { success: true, data: JSON.parse(raw) };
+    }
+    const completedFile = path.join(__dirname, 'schedule_data_completed.json');
+    if (fs.existsSync(completedFile)) {
+      const raw = fs.readFileSync(completedFile, 'utf8');
+      return { success: true, data: JSON.parse(raw), isCompletedArchive: true };
+    }
+    const backupFile = path.join(__dirname, 'schedule_data.json.bak');
+    if (fs.existsSync(backupFile)) {
+      const raw = fs.readFileSync(backupFile, 'utf8');
+      return { success: true, data: JSON.parse(raw), isBackup: true };
+    }
+    return { success: true, data: null };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -275,7 +287,10 @@ ipcMain.handle('schedule:load', async () => {
 
 ipcMain.handle('schedule:clear', async () => {
   try {
-    if (fs.existsSync(SCHEDULE_FILE)) fs.unlinkSync(SCHEDULE_FILE);
+    if (fs.existsSync(SCHEDULE_FILE)) {
+      try { fs.copyFileSync(SCHEDULE_FILE, SCHEDULE_FILE + '.bak'); } catch (e) { }
+      fs.unlinkSync(SCHEDULE_FILE);
+    }
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -344,8 +359,12 @@ ipcMain.handle('schedule:delete-os-task', async () => {
       resolve();
     });
   });
-  try { if (fs.existsSync(SCHEDULE_FILE)) fs.unlinkSync(SCHEDULE_FILE); } catch (e) { }
-  try { if (fs.existsSync(BAT_FILE)) fs.unlinkSync(BAT_FILE); } catch (e) { }
+  try {
+    if (fs.existsSync(SCHEDULE_FILE)) {
+      try { fs.copyFileSync(SCHEDULE_FILE, SCHEDULE_FILE + '.bak'); } catch (e) { }
+      fs.unlinkSync(SCHEDULE_FILE);
+    }
+  } catch (e) { }
   return errors.length === 0
     ? { success: true }
     : { success: false, error: errors.join('; ') };
@@ -443,6 +462,21 @@ ipcMain.handle('signature:save', async (event, signatureText) => {
     const sigFile = path.join(__dirname, 'signature.txt');
     fs.writeFileSync(sigFile, signatureText || '', 'utf8');
     return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// ===========================================================================
+// IPC Handlers: Body/Subject Template File (BODY.txt)
+// ===========================================================================
+ipcMain.handle('bodyTemplate:load', async () => {
+  try {
+    const bodyFile = path.join(__dirname, 'BODY.txt');
+    if (fs.existsSync(bodyFile)) {
+      return { success: true, content: fs.readFileSync(bodyFile, 'utf8') };
+    }
+    return { success: true, content: null };
   } catch (err) {
     return { success: false, error: err.message };
   }

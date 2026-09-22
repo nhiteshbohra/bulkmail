@@ -17,7 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     googleSignedIn: false,
     stopRequested: false,
     pauseRequested: false,
-    globalAttachmentPaths: []
+    globalAttachmentPaths: [],
+    globalTemplate: null // { subject, body } loaded from BODY.txt when no Excel Subject/Body column is mapped
   };
 
   // Schedule state (declared early so updateStartButtonState can reference it)
@@ -74,6 +75,53 @@ document.addEventListener('DOMContentLoaded', () => {
   if (smtpUser) {
     smtpUser.addEventListener('input', loadSignatureForCurrentAccount);
     smtpUser.addEventListener('change', loadSignatureForCurrentAccount);
+  }
+
+  // Global Subject/Body template from BODY.txt — lets the user just edit that
+  // file (Subject: ... on the first line, body after a blank line) instead of
+  // maintaining Subject/Body columns in every Excel sheet. Only used when no
+  // Excel column is mapped to Topic/Body (column mapping always wins).
+  function parseBodyTemplateFile(content) {
+    if (!content) return null;
+    const lines = content.replace(/\r\n/g, '\n').split('\n');
+    let subject = '';
+    let bodyStartIdx = 0;
+    if (lines[0] && /^subject:/i.test(lines[0].trim())) {
+      subject = lines[0].replace(/^subject:/i, '').trim();
+      bodyStartIdx = 1;
+      if (lines[bodyStartIdx] !== undefined && lines[bodyStartIdx].trim() === '') {
+        bodyStartIdx++;
+      }
+    }
+    const body = lines.slice(bodyStartIdx).join('\n').trim();
+    return { subject, body };
+  }
+
+  async function loadGlobalBodyTemplate() {
+    const bodyFileStatus = document.getElementById('bodyFileStatus');
+    if (!window.electronAPI || !window.electronAPI.loadBodyTemplateFile) return;
+    try {
+      const res = await window.electronAPI.loadBodyTemplateFile();
+      state.globalTemplate = (res && res.success && res.content) ? parseBodyTemplateFile(res.content) : null;
+    } catch (_) {
+      state.globalTemplate = null;
+    }
+    if (bodyFileStatus) {
+      bodyFileStatus.textContent = state.globalTemplate
+        ? `Using Subject/Body from BODY.txt: "${state.globalTemplate.subject}"`
+        : 'BODY.txt not found — map Subject/Body columns from Excel instead.';
+    }
+    buildCampaignLogs();
+    renderLogTable();
+    updateMetrics();
+    updateStartButtonState();
+  }
+
+  loadGlobalBodyTemplate();
+
+  const btnReloadBodyFile = document.getElementById('btnReloadBodyFile');
+  if (btnReloadBodyFile) {
+    btnReloadBodyFile.addEventListener('click', loadGlobalBodyTemplate);
   }
 
   const dropZone = document.getElementById('dropZone');
@@ -448,8 +496,8 @@ document.addEventListener('DOMContentLoaded', () => {
       let recipientRaw = emailCol ? String(row[emailCol] || '').trim() : '';
       let ccRaw = ccCol ? String(row[ccCol] || '').trim() : '';
       let bccRaw = bccCol ? String(row[bccCol] || '').trim() : '';
-      let topicRaw = topicCol ? String(row[topicCol] || '') : '';
-      let bodyRaw = bodyCol ? String(row[bodyCol] || '') : '';
+      let topicRaw = topicCol ? String(row[topicCol] || '') : (state.globalTemplate ? state.globalTemplate.subject : '');
+      let bodyRaw = bodyCol ? String(row[bodyCol] || '') : (state.globalTemplate ? state.globalTemplate.body : '');
       let attachmentRaw = attachmentCol ? String(row[attachmentCol] || '').trim() : '';
 
       // Substitute row variables for placeholders e.g., {COLUMN_NAME}
@@ -560,8 +608,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function _coreUpdateStart() {
     const hasData = state.campaignLogs.length > 0;
     const hasEmailMap = mapEmail.value !== '';
-    const hasTopicMap = mapTopic.value !== '';
-    const hasBodyMap = mapBody.value !== '';
+    const hasTopicMap = mapTopic.value !== '' || !!(state.globalTemplate && state.globalTemplate.subject);
+    const hasBodyMap = mapBody.value !== '' || !!(state.globalTemplate && state.globalTemplate.body);
     const hasHost = smtpHost.value.trim() !== '';
 
     btnStart.disabled = !(hasData && hasEmailMap && hasTopicMap && hasBodyMap && hasHost && state.status === 'idle');
@@ -1079,6 +1127,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function addWeekdays(startDate, numDays, weekdaysOnly = true) {
     let cur = new Date(startDate);
     let added = 0;
+    if (weekdaysOnly) {
+      while (cur.getDay() === 0 || cur.getDay() === 6) {
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
     while (added < numDays) {
       cur.setDate(cur.getDate() + 1);
       const day = cur.getDay(); // 0: Sun, 6: Sat
@@ -1380,22 +1433,33 @@ document.addEventListener('DOMContentLoaded', () => {
         batches: batches
       };
 
-      await window.electronAPI.saveSchedule(payload);
+      const saveResult = await window.electronAPI.saveSchedule(payload);
+      if (!saveResult || !saveResult.success) {
+        btnSchedule.disabled = false;
+        alert(`Could not save schedule: ${saveResult && saveResult.error ? saveResult.error : 'Unknown error'}`);
+        return;
+      }
 
       // 2. Register Windows Task Scheduler background task for the first batch
       const osTaskRes = await window.electronAPI.createOsTask({ isoString: firstIso });
+      if (!osTaskRes || !osTaskRes.success) {
+        await window.electronAPI.clearSchedule();
+        btnSchedule.disabled = false;
+        alert(`Could not register Windows schedule: ${osTaskRes && osTaskRes.error ? osTaskRes.error : 'Unknown error'}`);
+        return;
+      }
 
       // 3. Setup in-app timer (if app stays open)
-      armScheduleTimeout(firstIso, msUntil);
+      const firstTargetDate = new Date(firstIso);
+      const firstMsUntil = firstTargetDate - Date.now();
+      armScheduleTimeout(firstIso, firstMsUntil);
       startCountdownUI(firstIso);
       applyScheduledUI(firstIso, payload);
 
       if (useBatches) {
-        showScheduleToast(`⚡ Multi-day campaign scheduled! ${batches.length} batches created (${dailyLimit}/day max). Batch #1 set for ${targetDate.toLocaleString()}.`);
-      } else if (osTaskRes && osTaskRes.success) {
-        showScheduleToast(`⚡ Scheduled in Windows! Emails will send on ${targetDate.toLocaleString()} even if app is closed.`);
+        showScheduleToast(`⚡ Multi-day campaign scheduled! ${batches.length} batches created (${dailyLimit}/day max). Batch #1 set for ${firstTargetDate.toLocaleString()}.`);
       } else {
-        showScheduleToast(`Scheduled for ${targetDate.toLocaleString()} (In-app timer active).`);
+        showScheduleToast(`⚡ Scheduled in Windows! Emails will send on ${firstTargetDate.toLocaleString()} even if app is closed.`);
       }
     });
   }
@@ -1475,9 +1539,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showScheduleToast(`⚡ Multi-day schedule active: Batch #${nextPending.batchNumber} (${nextPending.dayLabel}) fires next.`);
       } else {
-        // All batches completed
+        // All batches completed - keep UI populated with completed progress
+        applyScheduledUI(saved.isoString, saved);
         await window.electronAPI.deleteOsTask();
-        await window.electronAPI.clearSchedule();
       }
       return;
     }
@@ -1487,8 +1551,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const msUntil = targetDate - Date.now();
 
     if (msUntil <= 0) {
+      if (saved.campaignLogs && saved.campaignLogs.length > 0 && state.campaignLogs.length === 0) {
+        state.campaignLogs = saved.campaignLogs;
+        renderLogTable();
+        updateMetrics();
+      }
+      applyScheduledUI(saved.isoString, saved);
       await window.electronAPI.deleteOsTask();
-      await window.electronAPI.clearSchedule();
       return;
     }
 
@@ -1755,8 +1824,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tpl.mappings.cc && mapCc) mapCc.value = tpl.mappings.cc;
         if (tpl.mappings.bcc && mapBcc) mapBcc.value = tpl.mappings.bcc;
         if (tpl.mappings.attachment && mapAttachment) mapAttachment.value = tpl.mappings.attachment;
-        if (tpl.signature && emailSignature) emailSignature.value = tpl.signature;
-        generateLogsFromMapping();
+        buildCampaignLogs();
+        renderLogTable();
+        updateMetrics();
       }
     });
   }

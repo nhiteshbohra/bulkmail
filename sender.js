@@ -39,11 +39,16 @@ function writeLog(results, batchLabel) {
 }
 
 function cleanupSchedule() {
-  try { if (fs.existsSync(DATA_FILE)) fs.unlinkSync(DATA_FILE); } catch (e) { }
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      fs.copyFileSync(DATA_FILE, DATA_FILE + '.bak');
+      const completedPath = path.join(__dirname, 'schedule_data_completed.json');
+      fs.copyFileSync(DATA_FILE, completedPath);
+      fs.unlinkSync(DATA_FILE);
+    }
+  } catch (e) { }
   exec('schtasks /delete /tn "' + TASK_NAME + '" /f', () => { });
-  const bat = path.join(__dirname, 'run_schedule.bat');
-  if (fs.existsSync(bat)) try { fs.unlinkSync(bat); } catch (e) { }
-  console.log('[AutoMail] Cleaned up schedule files and Windows scheduled task.');
+  console.log('[AutoMail] Archived schedule to schedule_data_completed.json and cleaned up Windows task.');
 }
 
 function rescheduleNextTask(isoString) {
