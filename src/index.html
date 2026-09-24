@@ -25,6 +25,10 @@
 
       </div>
       <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
+        <button id="btnChangeAccount" class="btn btn-outline btn-sm hidden" style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 6px 12px;" title="Sign in with a different SMTP account">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Change Account
+        </button>
         <button id="btnOpenHistoryDrawer" class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 6px 12px;">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
           📜 Campaign History
@@ -36,219 +40,276 @@
       </div>
     </header>
 
+    <!-- Sign-In Gate: shown alone until SMTP credentials are verified -->
+    <div id="signInGate" class="sign-in-gate">
+      <div class="sign-in-card card glass-panel">
+        <div class="card-header">
+          <h2>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            Sign In to Your Mail Account
+          </h2>
+        </div>
+
+        <!-- SMTP Panel -->
+        <div id="smtpEnginePanel" class="engine-panel">
+          <div class="card-header" style="padding-bottom: 6px;">
+            <h2>SMTP Credentials & Presets</h2>
+            <div class="preset-selector">
+              <select id="presetSelect" title="Select Quick Preset">
+                <option value="custom">Custom SMTP</option>
+                <option value="gmail">Gmail / Google Workspace</option>
+                <option value="outlook">Outlook / Office365</option>
+                <option value="yahoo">Yahoo Mail</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group col-8">
+              <label for="smtpHost">SMTP Server Host</label>
+              <input type="text" id="smtpHost" placeholder="smtp.gmail.com" value="smtp.gmail.com">
+            </div>
+            <div class="form-group col-4">
+              <label for="smtpPort">Port</label>
+              <input type="number" id="smtpPort" placeholder="587" value="587">
+            </div>
+
+            <div class="form-group col-12 checkbox-group">
+              <input type="checkbox" id="smtpSecure">
+              <label for="smtpSecure">Use SSL/TLS (Required for Port 465)</label>
+            </div>
+
+            <div class="form-group col-12">
+              <label for="smtpUser">Sender Email / User</label>
+              <input type="email" id="smtpUser" placeholder="your.name@gmail.com">
+            </div>
+
+            <div class="form-group col-12">
+              <label for="smtpPass">Password / App Password</label>
+              <input type="password" id="smtpPass" placeholder="••••••••••••••••">
+              <span class="input-hint">For Gmail, use a generated 16-character App Password.</span>
+            </div>
+
+            <div class="form-group col-12">
+              <label for="smtpFromName">Display Name (From Name)</label>
+              <input type="text" id="smtpFromName" placeholder="John Doe Marketing">
+            </div>
+          </div>
+
+          <div class="card-footer" style="display: flex; gap: 8px;">
+            <button id="btnTestSmtp" class="btn btn-primary btn-lg">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Sign In
+            </button>
+            <button id="btnOpenTestMailModal" class="btn btn-outline" style="display: flex; align-items: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Send Test Mail
+            </button>
+          </div>
+        </div>
+
+        <div id="smtpFeedback" class="alert-box hidden"></div>
+
+        <button id="btnSkipSignIn" type="button" class="text-btn" style="margin-top: 10px; font-size: 0.78rem; color: var(--text-secondary); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; display: block;">
+          Just checking an existing schedule or campaign history? Continue without signing in →
+        </button>
+      </div>
+    </div>
+
+    <div id="appShell" class="hidden">
+    <!-- Page Tabs -->
+    <nav class="page-tabs">
+      <button class="page-tab-btn active" data-page="compose" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        Compose
+      </button>
+      <button class="page-tab-btn" data-page="send" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Send
+      </button>
+      <button class="page-tab-btn" data-page="schedule" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Schedule
+      </button>
+    </nav>
+
     <!-- Main Content Area -->
     <main class="app-content">
-      <div class="grid-layout">
 
-        <!-- Column 1: Configuration & Import Setup -->
-        <div class="column setup-column">
-          
-          <!-- Card 1: Dispatch Engine & Credentials -->
-          <section class="card glass-panel">
-            <div class="card-header">
-              <h2>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                1. Sending Engine Setup
-              </h2>
-            </div>
+      <!-- Page: Compose -->
+      <div class="page-panel" id="page-compose">
+        <div class="grid-layout">
 
-            <!-- SMTP Panel -->
-            <div id="smtpEnginePanel" class="engine-panel">
-              <div class="card-header" style="padding-bottom: 6px;">
-                <h2>SMTP Credentials & Presets</h2>
-                <div class="preset-selector">
-                  <select id="presetSelect" title="Select Quick Preset">
-                    <option value="custom">Custom SMTP</option>
-                    <option value="gmail">Gmail / Google Workspace</option>
-                    <option value="outlook">Outlook / Office365</option>
-                    <option value="yahoo">Yahoo Mail</option>
+          <!-- Column 1: Excel Import & Mapping -->
+          <div class="column setup-column">
+
+            <!-- Card: Excel / CSV Import -->
+            <section class="card glass-panel">
+              <div class="card-header">
+                <h2>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M10 9h2"/></svg>
+                  1. Select Excel File & Mapping
+                </h2>
+              </div>
+
+              <div class="drop-zone" id="dropZone">
+                <div class="drop-icon">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </div>
+                <p class="drop-title">Drop your Excel file here or click to browse</p>
+                <p class="drop-subtitle">Supports .xlsx, .xls, .csv</p>
+                <button id="btnSelectFile" class="btn btn-outline btn-sm">Choose File</button>
+              </div>
+
+              <div id="fileInfoBox" class="file-info-box hidden">
+                <div class="file-details">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>
+                  <div>
+                    <div id="fileNameText" class="file-name">filename.xlsx</div>
+                    <div id="fileRowsCount" class="file-count">0 rows loaded</div>
+                  </div>
+                </div>
+                <button id="btnRemoveFile" class="btn-icon" title="Remove file">&times;</button>
+              </div>
+
+              <!-- Template Toolbar -->
+              <div class="template-toolbar" style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-card); border-radius: var(--radius-sm); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 180px;">
+                  <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);">Template:</span>
+                  <select id="templateSelect" class="select-highlight" style="flex: 1; font-size: 0.8rem; padding: 5px 8px;">
+                    <option value="">-- Custom / Default --</option>
                   </select>
                 </div>
+                <div style="display: flex; gap: 6px;">
+                  <button id="btnOpenSaveTemplateModal" type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 5px 10px;" title="Save current template">
+                    💾 Save Template
+                  </button>
+                  <button id="btnDeleteTemplate" type="button" class="btn btn-outline btn-sm hidden" style="font-size: 0.75rem; padding: 5px 8px; color: var(--accent-red);" title="Delete selected template">
+                    🗑️
+                  </button>
+                </div>
               </div>
 
-              <div class="form-grid">
-                <div class="form-group col-8">
-                  <label for="smtpHost">SMTP Server Host</label>
-                  <input type="text" id="smtpHost" placeholder="smtp.gmail.com" value="smtp.gmail.com">
-                </div>
-                <div class="form-group col-4">
-                  <label for="smtpPort">Port</label>
-                  <input type="number" id="smtpPort" placeholder="587" value="587">
-                </div>
-
-                <div class="form-group col-12 checkbox-group">
-                  <input type="checkbox" id="smtpSecure">
-                  <label for="smtpSecure">Use SSL/TLS (Required for Port 465)</label>
+              <!-- Mapping Controls -->
+              <div id="mappingSection" class="mapping-section hidden">
+                <div class="section-subtitle" style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>Map Columns to Email Fields</span>
+                  <button id="btnPreviewEmail" type="button" class="btn btn-accent btn-sm" style="display: flex; align-items: center; gap: 6px; font-size: 0.78rem; padding: 4px 10px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Preview Rendered Email
+                  </button>
                 </div>
 
-                <div class="form-group col-12">
-                  <label for="smtpUser">Sender Email / User</label>
-                  <input type="email" id="smtpUser" placeholder="your.name@gmail.com">
+                <div class="form-group">
+                  <label for="mapEmail">Recipient Email Address Column <span class="required">*</span></label>
+                  <select id="mapEmail" class="select-highlight"></select>
                 </div>
 
-                <div class="form-group col-12">
-                  <label for="smtpPass">Password / App Password</label>
-                  <input type="password" id="smtpPass" placeholder="••••••••••••••••">
-                  <span class="input-hint">For Gmail, use a generated 16-character App Password.</span>
+                <div class="form-group">
+                  <label for="mapTopic">Email Topic / Subject Column <span class="required">*</span></label>
+                  <select id="mapTopic" class="select-highlight"></select>
                 </div>
 
-                <div class="form-group col-12">
-                  <label for="smtpFromName">Display Name (From Name)</label>
-                  <input type="text" id="smtpFromName" placeholder="John Doe Marketing">
+                <div class="form-group">
+                  <label for="mapBody">Email Body Column <span class="required">*</span></label>
+                  <select id="mapBody" class="select-highlight"></select>
                 </div>
 
-                <div class="form-group col-12">
-                  <label for="emailSignature" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Email Signature <span style="font-weight: normal; color: var(--text-secondary);">(Appended to all emails)</span></span>
-                    <span style="font-size: 0.72rem; color: #34d399; font-weight: normal;">✓ Clickable Links Supported</span>
+                <div class="form-group">
+                  <label for="mapCc">CC Email Column <span style="font-weight: normal; color: var(--text-secondary);">(Optional)</span></label>
+                  <select id="mapCc" class="select-highlight"></select>
+                </div>
+
+                <div class="form-group">
+                  <label for="mapBcc">BCC Email Column <span style="font-weight: normal; color: var(--text-secondary);">(Optional)</span></label>
+                  <select id="mapBcc" class="select-highlight"></select>
+                </div>
+
+                <div class="form-group">
+                  <label for="mapAttachment">Attachment File Path Column <span style="font-weight: normal; color: var(--text-secondary);">(Optional - supports multi-file paths)</span></label>
+                  <select id="mapAttachment" class="select-highlight"></select>
+                </div>
+
+                <!-- Master Global Attachment -->
+                <div class="form-group" style="margin-top: 4px; background: rgba(255, 255, 255, 0.03); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-card);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label style="margin-bottom: 0; font-weight: 600; color: var(--text-primary);">
+                      Global Master Attachments / Images
+                      <span style="font-weight: normal; color: var(--text-secondary);">(Sent to all emails)</span>
+                    </label>
+                    <button id="btnClearAllGlobalAttach" type="button" class="text-btn hidden" style="font-size: 0.72rem; color: var(--accent-red); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0;">Clear All</button>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <button id="btnSelectGlobalAttach" type="button" class="btn btn-secondary btn-sm" style="font-size: 0.78rem; padding: 6px 12px;">
+                      📎 Choose Images / Files
+                    </button>
+                    <span id="globalAttachCountText" style="font-size: 0.78rem; color: var(--text-secondary);">No global files selected</span>
+                  </div>
+                  <div id="globalAttachList" class="global-attach-chip-list"></div>
+                </div>
+
+                <div class="form-group checkbox-group" style="margin-top: 6px; background: rgba(59, 130, 246, 0.06); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(59, 130, 246, 0.15);">
+                  <input type="checkbox" id="splitMultipleEmails" checked>
+                  <label for="splitMultipleEmails" style="font-size: 0.78rem; font-weight: 500; cursor: pointer;">
+                    Split multi-email cells (e.g., 3-4 IDs separated by <code>,</code> or <code>;</code>) into individual recipients
                   </label>
-                  <textarea id="emailSignature" rows="4" style="width: 100%; font-family: inherit; font-size: 0.8rem; background: rgba(0,0,0,0.25); border: 1px solid var(--border-card); border-radius: var(--radius-sm); color: var(--text-primary); padding: 8px 10px; resize: vertical;" placeholder="--&#10;Best regards,&#10;Your Name&#10;+91 9876543210&#10;[LinkedIn](http://linkedin.com/in/yourprofile) | [GitHub](http://github.com/yourprofile)"></textarea>
-                  <span class="input-hint">Markdown links like <code>[LinkedIn](http://...)</code>, emails, and phone numbers are automatically converted into clickable links.</span>
+                </div>
+
+                <div class="template-tip">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  <span>Variables in Excel (e.g., <code>{FIRST_NAME}</code>) will automatically be parsed per recipient!</span>
                 </div>
               </div>
+            </section>
 
-              <div class="card-footer" style="display: flex; gap: 8px;">
-                <button id="btnTestSmtp" class="btn btn-secondary">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                  Test Connection
-                </button>
-                <button id="btnOpenTestMailModal" class="btn btn-outline" style="display: flex; align-items: center; gap: 6px;">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  Send Test Mail
-                </button>
-              </div>
-            </div>
+          </div>
 
-            <div id="smtpFeedback" class="alert-box hidden"></div>
-          </section>
+          <!-- Column 2: Body & Signature -->
+          <div class="column setup-column">
 
-          <!-- Card 2: Excel / CSV Import -->
-          <section class="card glass-panel">
-            <div class="card-header">
-              <h2>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M10 9h2"/></svg>
-                2. Select Excel File & Mapping
-              </h2>
-            </div>
-
-            <div class="drop-zone" id="dropZone">
-              <div class="drop-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              </div>
-              <p class="drop-title">Drop your Excel file here or click to browse</p>
-              <p class="drop-subtitle">Supports .xlsx, .xls, .csv</p>
-              <button id="btnSelectFile" class="btn btn-outline btn-sm">Choose File</button>
-            </div>
-
-            <div id="fileInfoBox" class="file-info-box hidden">
-              <div class="file-details">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>
-                <div>
-                  <div id="fileNameText" class="file-name">filename.xlsx</div>
-                  <div id="fileRowsCount" class="file-count">0 rows loaded</div>
-                </div>
-              </div>
-              <button id="btnRemoveFile" class="btn-icon" title="Remove file">&times;</button>
-            </div>
-
-            <!-- Template Toolbar -->
-            <div class="template-toolbar" style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-card); border-radius: var(--radius-sm); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 180px;">
-                <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);">Template:</span>
-                <select id="templateSelect" class="select-highlight" style="flex: 1; font-size: 0.8rem; padding: 5px 8px;">
-                  <option value="">-- Custom / Default --</option>
-                </select>
-              </div>
-              <div style="display: flex; gap: 6px;">
-                <button id="btnOpenSaveTemplateModal" type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 5px 10px;" title="Save current template">
-                  💾 Save Template
-                </button>
-                <button id="btnDeleteTemplate" type="button" class="btn btn-outline btn-sm hidden" style="font-size: 0.75rem; padding: 5px 8px; color: var(--accent-red);" title="Delete selected template">
-                  🗑️
-                </button>
-                <button id="btnReloadBodyFile" type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 5px 10px;" title="Reload Subject/Body from BODY.txt (edit that file, then click this)">
+            <!-- Card: Email Body -->
+            <section class="card glass-panel">
+              <div class="card-header">
+                <h2>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  2. Email Subject & Body
+                </h2>
+                <button id="btnReloadBodyFile" type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 5px 10px;" title="Reload Subject/Body from BODY.txt on disk">
                   🔄 Reload BODY.txt
                 </button>
               </div>
-            </div>
-            <div id="bodyFileStatus" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 4px;"></div>
-
-            <!-- Mapping Controls -->
-            <div id="mappingSection" class="mapping-section hidden">
-              <div class="section-subtitle" style="display: flex; justify-content: space-between; align-items: center;">
-                <span>Map Columns to Email Fields</span>
-                <button id="btnPreviewEmail" type="button" class="btn btn-accent btn-sm" style="display: flex; align-items: center; gap: 6px; font-size: 0.78rem; padding: 4px 10px;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  Preview Rendered Email
-                </button>
-              </div>
-
               <div class="form-group">
-                <label for="mapEmail">Recipient Email Address Column <span class="required">*</span></label>
-                <select id="mapEmail" class="select-highlight"></select>
+                <label for="bodyPasteBox">Paste or edit here <span style="font-weight: normal; color: var(--text-secondary);">(first line: <code>Subject: ...</code>, blank line, then the body)</span></label>
+                <textarea id="bodyPasteBox" rows="14" style="width: 100%; font-family: inherit; font-size: 0.8rem; background: rgba(0,0,0,0.25); border: 1px solid var(--border-card); border-radius: var(--radius-sm); color: var(--text-primary); padding: 8px 10px; resize: vertical;" placeholder="Subject: Application for {Role} at {Company}&#10;&#10;Hello {Company} Team,&#10;&#10;..."></textarea>
+                <span class="input-hint">Used for every recipient unless a Subject/Body column is mapped on the left. <code>{ColumnName}</code> is replaced per recipient from the Excel sheet.</span>
               </div>
+              <div id="bodyFileStatus" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 4px;"></div>
+            </section>
 
+            <!-- Card: Email Signature -->
+            <section class="card glass-panel">
+              <div class="card-header">
+                <h2>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                  3. Signature
+                </h2>
+                <span style="font-size: 0.72rem; color: #34d399; font-weight: normal;">✓ Clickable Links Supported</span>
+              </div>
               <div class="form-group">
-                <label for="mapTopic">Email Topic / Subject Column <span class="required">*</span></label>
-                <select id="mapTopic" class="select-highlight"></select>
+                <label for="emailSignature">Appended to every email</label>
+                <textarea id="emailSignature" rows="6" style="width: 100%; font-family: inherit; font-size: 0.8rem; background: rgba(0,0,0,0.25); border: 1px solid var(--border-card); border-radius: var(--radius-sm); color: var(--text-primary); padding: 8px 10px; resize: vertical;" placeholder="--&#10;Best regards,&#10;Your Name&#10;+91 9876543210&#10;[LinkedIn](http://linkedin.com/in/yourprofile) | [GitHub](http://github.com/yourprofile)"></textarea>
+                <span class="input-hint">Markdown links like <code>[LinkedIn](http://...)</code>, emails, and phone numbers are automatically converted into clickable links.</span>
               </div>
+            </section>
 
-              <div class="form-group">
-                <label for="mapBody">Email Body Column <span class="required">*</span></label>
-                <select id="mapBody" class="select-highlight"></select>
-              </div>
-
-              <div class="form-group">
-                <label for="mapCc">CC Email Column <span style="font-weight: normal; color: var(--text-secondary);">(Optional)</span></label>
-                <select id="mapCc" class="select-highlight"></select>
-              </div>
-
-              <div class="form-group">
-                <label for="mapBcc">BCC Email Column <span style="font-weight: normal; color: var(--text-secondary);">(Optional)</span></label>
-                <select id="mapBcc" class="select-highlight"></select>
-              </div>
-
-              <div class="form-group">
-                <label for="mapAttachment">Attachment File Path Column <span style="font-weight: normal; color: var(--text-secondary);">(Optional - supports multi-file paths)</span></label>
-                <select id="mapAttachment" class="select-highlight"></select>
-              </div>
-
-              <!-- Master Global Attachment -->
-              <div class="form-group" style="margin-top: 4px; background: rgba(255, 255, 255, 0.03); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-card);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <label style="margin-bottom: 0; font-weight: 600; color: var(--text-primary);">
-                    Global Master Attachments / Images 
-                    <span style="font-weight: normal; color: var(--text-secondary);">(Sent to all emails)</span>
-                  </label>
-                  <button id="btnClearAllGlobalAttach" type="button" class="text-btn hidden" style="font-size: 0.72rem; color: var(--accent-red); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0;">Clear All</button>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                  <button id="btnSelectGlobalAttach" type="button" class="btn btn-secondary btn-sm" style="font-size: 0.78rem; padding: 6px 12px;">
-                    📎 Choose Images / Files
-                  </button>
-                  <span id="globalAttachCountText" style="font-size: 0.78rem; color: var(--text-secondary);">No global files selected</span>
-                </div>
-                <div id="globalAttachList" class="global-attach-chip-list"></div>
-              </div>
-
-              <div class="form-group checkbox-group" style="margin-top: 6px; background: rgba(59, 130, 246, 0.06); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(59, 130, 246, 0.15);">
-                <input type="checkbox" id="splitMultipleEmails" checked>
-                <label for="splitMultipleEmails" style="font-size: 0.78rem; font-weight: 500; cursor: pointer;">
-                  Split multi-email cells (e.g., 3-4 IDs separated by <code>,</code> or <code>;</code>) into individual recipients
-                </label>
-              </div>
-
-              <div class="template-tip">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                <span>Variables in Excel (e.g., <code>{FIRST_NAME}</code>) will automatically be parsed per recipient!</span>
-              </div>
-            </div>
-          </section>
+          </div>
 
         </div>
+      </div>
 
-        <!-- Column 2: Automation Controls & Live Log Monitor -->
-        <div class="column monitor-column">
+      <!-- Page: Send -->
+      <div class="page-panel hidden" id="page-send">
+        <div class="page-single-column page-single-column-wide">
 
           <!-- Card 3: Execution Controls & Metrics -->
           <section class="card glass-panel">
@@ -320,6 +381,14 @@
                 </span>
               </label>
 
+              <label class="checkbox-container quota-guard-toggle" title="Never re-email someone already contacted in a previous campaign, even from a different sheet">
+                <input type="checkbox" id="chkSkipContacted" checked>
+                <span class="custom-checkbox"></span>
+                <span class="checkbox-text">
+                  <strong>Dedupe:</strong> Skip previously-contacted recipients
+                </span>
+              </label>
+
               <button id="btnValidateList" type="button" class="btn btn-secondary btn-sm" title="Scan all loaded recipient emails for dead domains, typos, and bad syntax before starting" disabled>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 Verify List
@@ -371,97 +440,6 @@
             </div>
           </section>
 
-          <!-- Card 3.5: Schedule Campaign -->
-          <section class="card glass-panel" id="scheduleCard">
-            <div class="card-header">
-              <h2>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                ⏰ Schedule Campaign
-              </h2>
-              <span id="scheduleBadge" class="schedule-badge hidden">Scheduled</span>
-            </div>
-
-            <div class="schedule-body">
-              <div class="schedule-row">
-                <div class="form-group" style="flex:1; margin-bottom:0;">
-                  <label for="scheduleDateTime">Send Campaign At</label>
-                  <input type="datetime-local" id="scheduleDateTime" class="schedule-input">
-                </div>
-                <div class="schedule-btn-group">
-                  <button id="btnSchedule" class="btn btn-accent btn-schedule" disabled>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    Schedule
-                  </button>
-                  <button id="btnCancelSchedule" class="btn btn-danger btn-schedule hidden">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    Cancel Schedule
-                  </button>
-                </div>
-              </div>
-
-              <!-- Batch Configuration Section -->
-              <div id="batchConfigSection" class="batch-config-section">
-                <div class="batch-toggle-row">
-                  <label class="checkbox-container">
-                    <input type="checkbox" id="chkDailyBatches" checked>
-                    <span class="custom-checkbox"></span>
-                    <span class="checkbox-text"><strong>Split into Safe Daily Batches</strong> (Avoid Gmail 500 emails/day quota limit)</span>
-                  </label>
-                </div>
-
-                <div id="batchOptionsSubRow" class="batch-options-subrow">
-                  <div class="batch-limit-group">
-                    <label for="inputDailyLimit">Max Per Day:</label>
-                    <input type="number" id="inputDailyLimit" class="batch-limit-input" value="500" min="50" max="2000" step="50">
-                    <span class="batch-hint-badge">Gmail Safe: ≤500</span>
-                  </div>
-                  <label class="checkbox-container">
-                    <input type="checkbox" id="chkWeekdaysOnly" checked>
-                    <span class="custom-checkbox"></span>
-                    <span class="checkbox-text">Weekdays Only (Mon – Fri, skip weekends)</span>
-                  </label>
-                </div>
-
-                <!-- Batch Preview Box (shown before scheduling) -->
-                <div id="batchPreviewBox" class="batch-preview-box hidden">
-                  <div class="batch-preview-header">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <span id="batchPreviewTitle">Batch Distribution Plan</span>
-                  </div>
-                  <div id="batchPreviewList" class="batch-preview-list"></div>
-                </div>
-              </div>
-
-              <div class="schedule-hint">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span><strong>Fire-and-Forget:</strong> Automatically executed by Windows Task Scheduler in daily batches even if this application is closed.</span>
-              </div>
-
-              <!-- Countdown Display -->
-              <div id="scheduleCountdownBox" class="schedule-countdown hidden">
-                <div class="countdown-pulse"></div>
-                <div class="countdown-info" style="flex: 1;">
-                  <div class="countdown-label" id="scheduleCountdownLabel">Next batch fires in</div>
-                  <div id="scheduleCountdownTimer" class="countdown-timer">00:00:00</div>
-                  <div id="scheduleTargetTime" class="countdown-target"></div>
-                  <div class="countdown-os-status">⚡ Auto-managed by Windows Background Task Scheduler</div>
-                </div>
-              </div>
-
-              <!-- Active Multi-Batch Progress Timeline -->
-              <div id="activeBatchProgressBox" class="active-batch-progress-box hidden">
-                <div class="active-batch-header">
-                  <div class="active-batch-title">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                    <span>Multi-Day Campaign Schedule</span>
-                  </div>
-                  <span id="activeBatchProgressBadge" class="active-batch-badge">0 / 0 Batches Completed</span>
-                </div>
-                <div id="activeBatchTimeline" class="active-batch-timeline"></div>
-              </div>
-            </div>
-          </section>
-
           <!-- Card 4: Live Activity Table -->
           <section class="card glass-panel log-card">
             <div class="card-header">
@@ -470,6 +448,10 @@
                 4. Real-time Activity Log
               </h2>
               <div class="log-actions" style="display: flex; gap: 8px;">
+                <button id="btnCheckBounces" type="button" class="btn btn-outline btn-sm" title="Scan your inbox for bounce/delivery-failure notifications from the last 30 days, label them address-not-found in Gmail, and mark matching rows as failed">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  Check Bounces
+                </button>
                 <button id="btnResetLogs" class="btn btn-outline btn-sm" disabled title="Reset all recipient statuses back to pending">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                   Reset Statuses
@@ -518,9 +500,123 @@
           </section>
 
         </div>
-
       </div>
+
+      <!-- Page: Schedule -->
+      <div class="page-panel hidden" id="page-schedule">
+        <div class="page-single-column">
+
+          <!-- Card 3.5: Schedule Campaign -->
+          <section class="card glass-panel" id="scheduleCard">
+            <div class="card-header">
+              <h2>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                ⏰ Schedule Campaign
+              </h2>
+              <span id="scheduleBadge" class="schedule-badge hidden">Scheduled</span>
+            </div>
+
+            <div class="schedule-body">
+              <div id="scheduleCreationBlock">
+                <div class="schedule-row">
+                  <div class="form-group" style="flex:1; margin-bottom:0;">
+                    <label for="scheduleDateTime">Send Campaign At</label>
+                    <input type="datetime-local" id="scheduleDateTime" class="schedule-input">
+                  </div>
+                  <div class="schedule-btn-group">
+                    <button id="btnSchedule" class="btn btn-accent btn-schedule" disabled>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      <span id="btnScheduleLabel">Schedule</span>
+                    </button>
+                    <button id="btnSendNow" class="btn btn-secondary btn-schedule hidden" title="Skip the wait and send this campaign right now">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      Send Now
+                    </button>
+                    <button id="btnCancelSchedule" class="btn btn-danger btn-schedule hidden">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      Cancel Schedule
+                    </button>
+                  </div>
+                </div>
+                <div class="schedule-hint" id="scheduleEditHint" style="display: none;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <span>Pick a new date/time above and click <strong>Update Time</strong> to reschedule, or hit <strong>Send Now</strong> to send immediately without waiting.</span>
+                </div>
+
+                <!-- Batch Configuration Section -->
+                <div id="batchConfigSection" class="batch-config-section">
+                  <div class="batch-toggle-row">
+                    <label class="checkbox-container">
+                      <input type="checkbox" id="chkDailyBatches" checked>
+                      <span class="custom-checkbox"></span>
+                      <span class="checkbox-text"><strong>Split into Safe Daily Batches</strong> (Avoid Gmail 500 emails/day quota limit)</span>
+                    </label>
+                  </div>
+
+                  <div id="batchOptionsSubRow" class="batch-options-subrow">
+                    <div class="batch-limit-group">
+                      <label for="inputDailyLimit">Max Per Day:</label>
+                      <input type="number" id="inputDailyLimit" class="batch-limit-input" value="500" min="50" max="2000" step="50">
+                      <span class="batch-hint-badge">Gmail Safe: ≤500</span>
+                    </div>
+                    <label class="checkbox-container">
+                      <input type="checkbox" id="chkWeekdaysOnly" checked>
+                      <span class="custom-checkbox"></span>
+                      <span class="checkbox-text">Weekdays Only (Mon – Fri, skip weekends)</span>
+                    </label>
+                  </div>
+
+                  <!-- Batch Preview Box (shown before scheduling) -->
+                  <div id="batchPreviewBox" class="batch-preview-box hidden">
+                    <div class="batch-preview-header">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      <span id="batchPreviewTitle">Batch Distribution Plan</span>
+                    </div>
+                    <div id="batchPreviewList" class="batch-preview-list"></div>
+                  </div>
+                </div>
+
+                <div class="schedule-hint">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  <span><strong>Fire-and-Forget:</strong> Automatically executed by Windows Task Scheduler in daily batches even if this application is closed.</span>
+                </div>
+              </div>
+
+              <div class="schedule-hint" id="multiDayManagerHint" style="display: none;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>Manage each day's batch below — edit its time, send it now, or cancel it individually.</span>
+              </div>
+
+              <!-- Countdown Display -->
+              <div id="scheduleCountdownBox" class="schedule-countdown hidden">
+                <div class="countdown-pulse"></div>
+                <div class="countdown-info" style="flex: 1;">
+                  <div class="countdown-label" id="scheduleCountdownLabel">Next batch fires in</div>
+                  <div id="scheduleCountdownTimer" class="countdown-timer">00:00:00</div>
+                  <div id="scheduleTargetTime" class="countdown-target"></div>
+                  <div class="countdown-os-status">⚡ Auto-managed by Windows Background Task Scheduler</div>
+                </div>
+              </div>
+
+              <!-- Active Multi-Batch Progress Timeline -->
+              <div id="activeBatchProgressBox" class="active-batch-progress-box hidden">
+                <div class="active-batch-header">
+                  <div class="active-batch-title">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <span>Multi-Day Campaign Schedule</span>
+                  </div>
+                  <span id="activeBatchProgressBadge" class="active-batch-badge">0 / 0 Batches Completed</span>
+                </div>
+                <div id="activeBatchTimeline" class="active-batch-timeline"></div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
     </main>
+    </div>
   </div>
 
   <!-- Modal 1: Send Test Email -->
@@ -658,4 +754,3 @@
   <script src="renderer.js"></script>
 </body>
 </html>
-

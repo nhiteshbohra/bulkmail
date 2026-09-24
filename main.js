@@ -5,6 +5,8 @@ const { exec } = require('child_process');
 const XLSX = require('xlsx');
 const nodemailer = require('nodemailer');
 const { validateEmail, validateBatch } = require('./emailValidator');
+const contactRegistry = require('./contactRegistry');
+const mailSync = require('./mailSync');
 
 let mainWindow;
 
@@ -585,5 +587,68 @@ ipcMain.handle('campaigns:get-details', async (event, fileName) => {
   }
 });
 
+// ===========================================================================
+// IPC Handlers: Contact Registry (global dedupe + send/fail tracking)
+// ===========================================================================
+ipcMain.handle('registry:load', async () => {
+  try {
+    return { success: true, registry: contactRegistry.loadRegistry() };
+  } catch (err) {
+    return { success: false, error: err.message, registry: {} };
+  }
+});
+
+ipcMain.handle('registry:record-sent', async (event, { email, meta }) => {
+  try {
+    const registry = contactRegistry.loadRegistry();
+    contactRegistry.recordSent(registry, email, meta);
+    contactRegistry.saveRegistry(registry);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('registry:record-failed', async (event, { email, error, meta }) => {
+  try {
+    const registry = contactRegistry.loadRegistry();
+    contactRegistry.recordFailed(registry, email, error, meta);
+    contactRegistry.saveRegistry(registry);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('registry:backfill', async () => {
+  try {
+    const result = contactRegistry.backfillFromLogs(__dirname);
+    return { success: true, ...result };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// On-demand bounce check (no recurring task): scans INBOX for delivery-failure
+// notifications from the last 30 days via IMAP, and records any bounced
+// address already known to the contact registry as 'failed'.
+ipcMain.handle('bounces:check', async (event, { smtpConfig, knownRecipients }) => {
+  try {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const bounces = await mailSync.checkBounces(smtpConfig, since, knownRecipients || []);
+
+    const registry = contactRegistry.loadRegistry();
+    for (const b of bounces) {
+      if (contactRegistry.isContacted(registry, b.email)) {
+        contactRegistry.recordFailed(registry, b.email, b.reason);
+      }
+    }
+    contactRegistry.saveRegistry(registry);
+
+    return { success: true, bounces };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
 
 

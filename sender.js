@@ -7,7 +7,8 @@ const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
 const { exec } = require('child_process');
-const { validateEmail, formatEmailContent } = require('./emailValidator');
+const { validateEmail, formatEmailContent, isConnectivityError } = require('./emailValidator');
+const contactRegistry = require('./contactRegistry');
 
 const DATA_FILE = path.join(__dirname, 'schedule_data.json');
 const TASK_NAME = 'AutoMailExcelSchedule';
@@ -177,10 +178,22 @@ async function run() {
 
   const results = [];
   let sent = 0, fail = 0;
+  const registry = contactRegistry.loadRegistry();
+
+  // If the machine's own internet/network drops mid-run, don't plow through the
+  // rest of the batch marking hundreds of good recipients "failed" - detect a
+  // run of consecutive connectivity errors and pause the whole batch instead.
+  const NETWORK_OUTAGE_STREAK = 8;
+  const NETWORK_OUTAGE_RETRY_MINUTES = 20;
+  let connectivityStreak = 0;
+  let networkOutageDetected = false;
 
   for (let i = 0; i < itemsToSend.length; i++) {
     const item = itemsToSend[i];
     const prefix = `[AutoMail] (${i + 1}/${itemsToSend.length})`;
+
+    // Skip items already sent in a prior (interrupted) run of this same batch
+    if (item.status === 'sent') continue;
 
     // Validate recipient email format and active domain to protect daily sending quota
     const validation = await validateEmail(item.recipientEmail);
@@ -229,11 +242,15 @@ async function run() {
 
       await transporter.sendMail(opts);
       sent++;
+      connectivityStreak = 0;
       item.status = 'sent';
       item.sentTime = new Date().toLocaleString();
       item.error = '-';
       console.log(prefix, 'Sent ->', item.recipientEmail);
       results.push({ ...item });
+      contactRegistry.recordSent(registry, item.recipientEmail, {
+        company: item.company, subject: item.topic, body: item.body, cc: item.cc, bcc: item.bcc, attachmentPath: item.attachmentPath
+      });
 
       if (i < itemsToSend.length - 1) {
         let delaySec = parseInt(emailDelay, 10) || 0;
@@ -256,18 +273,45 @@ async function run() {
       item.sentTime = new Date().toLocaleString();
       console.error(prefix, 'Failed ->', item.recipientEmail, ':', err.message);
       results.push({ ...item });
+      contactRegistry.recordFailed(registry, item.recipientEmail, err.message, {
+        company: item.company, subject: item.topic, body: item.body, cc: item.cc, bcc: item.bcc, attachmentPath: item.attachmentPath
+      });
+
+      if (isConnectivityError(err)) {
+        connectivityStreak++;
+        if (connectivityStreak >= NETWORK_OUTAGE_STREAK) {
+          console.error(`[AutoMail] Network looks down (${connectivityStreak} connection errors in a row). Pausing batch instead of failing the remaining ${itemsToSend.length - i - 1} recipients.`);
+          networkOutageDetected = true;
+        }
+      } else {
+        connectivityStreak = 0;
+      }
     }
 
     // Periodically sync progress every 20 emails
     if (i > 0 && i % 20 === 0 && isMultiBatch) {
       try { fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8'); } catch (e) { }
+      try { contactRegistry.saveRegistry(registry); } catch (e) { }
     }
+
+    if (networkOutageDetected) break;
   }
+
+  try { contactRegistry.saveRegistry(registry); } catch (e) { }
 
   console.log(`[AutoMail] Batch complete! Sent: ${sent} | Failed: ${fail} | Total: ${itemsToSend.length}`);
   writeLog(results, batchLabel);
 
-  if (isMultiBatch && currentBatch) {
+  if (networkOutageDetected) {
+    // Leave this batch (or legacy campaign) as-is and pending - items already
+    // sent stay 'sent' (skipped on resume), the rest are untouched - then retry
+    // the SAME run shortly instead of chaining to the next batch or cleaning up.
+    const retryIso = new Date(Date.now() + NETWORK_OUTAGE_RETRY_MINUTES * 60 * 1000).toISOString();
+    data.savedAt = new Date().toISOString();
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+    console.log(`[AutoMail] Network outage detected - retrying this ${isMultiBatch ? 'batch' : 'campaign'} at ${retryIso} (in ${NETWORK_OUTAGE_RETRY_MINUTES} min).`);
+    await rescheduleNextTask(retryIso);
+  } else if (isMultiBatch && currentBatch) {
     currentBatch.status = 'completed';
     currentBatch.sentAt = new Date().toISOString();
     currentBatch.sentCount = sent;

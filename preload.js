@@ -24,6 +24,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSignatureFile:  (sig) => ipcRenderer.invoke('signature:save', sig),
   // Subject/Body template file (BODY.txt) synchronization
   loadBodyTemplateFile: () => ipcRenderer.invoke('bodyTemplate:load'),
+  // Contact Registry: global dedupe + send/fail tracking across all campaigns
+  loadRegistry:      () => ipcRenderer.invoke('registry:load'),
+  recordSent:        (email, meta) => ipcRenderer.invoke('registry:record-sent', { email, meta }),
+  recordFailed:      (email, error, meta) => ipcRenderer.invoke('registry:record-failed', { email, error, meta }),
+  backfillRegistry:  () => ipcRenderer.invoke('registry:backfill'),
+  checkBounces:      (smtpConfig, knownRecipients) => ipcRenderer.invoke('bounces:check', { smtpConfig, knownRecipients }),
   // Templates & Campaign History (Phase 1 & 2)
   sendSingleEmail:    (payload) => ipcRenderer.invoke('smtp:send-email', payload),
   loadTemplates:      () => ipcRenderer.invoke('templates:load'),

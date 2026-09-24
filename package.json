@@ -16,6 +16,8 @@
   "author": "Hitesh Bohra",
   "license": "ISC",
   "dependencies": {
+    "imapflow": "^2.0.6",
+    "mailparser": "^3.9.28",
     "nodemailer": "^10.0.9",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },

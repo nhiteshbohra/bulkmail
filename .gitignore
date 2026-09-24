@@ -20,6 +20,7 @@ schedule_data*.json
 .sender.lock
 run_schedule.bat
 campaign_log_*.json
+contacts_registry.json
 
 # 4. Exported Execution Reports & Spreadsheets
 Email_Campaign_Report_*.xlsx

@@ -11,6 +11,19 @@ const dns = require('dns').promises;
 // In-memory cache for domain lookup results: domain -> { active: boolean, reason: string, mx: Array }
 const domainCache = new Map();
 
+// DNS/network errors that mean "our resolver/connection is having trouble" rather
+// than "this domain doesn't exist". Treating these as invalid was misclassifying
+// entire dozens of good recipients as dead the moment the local network blipped -
+// a DNS server refusing/timing out mid-campaign is a local outage, not proof a
+// company's domain doesn't exist.
+const CONNECTIVITY_ERROR_CODES = new Set([
+  'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ENETUNREACH', 'ENETDOWN', 'EHOSTUNREACH'
+]);
+
+function isConnectivityError(err) {
+  return !!(err && CONNECTIVITY_ERROR_CODES.has(err.code));
+}
+
 // Pre-populate well-known, highly reliable active domains for 0ms instantaneous lookup
 const KNOWN_ACTIVE_DOMAINS = [
   'gmail.com', 'googlemail.com',
@@ -203,9 +216,11 @@ async function validateDomainMx(domain, timeoutMs = 4000) {
       reason = `Domain "${normDomain}" does not exist`;
     } else if (err.code === 'ENODATA' || err.code === 'NODATA') {
       reason = `Domain "${normDomain}" has no mail server configured (no MX records)`;
-    } else if (err.message && err.message.includes('timed out')) {
-      // If DNS timed out, assume cautiously valid to prevent blocking legitimate contacts due to network lag
-      return { active: true, reason: 'DNS query timed out (allowed cautiously)', mx: [] };
+    } else if ((err.message && err.message.includes('timed out')) || isConnectivityError(err)) {
+      // Our own DNS resolver/network is unreachable right now - not evidence the
+      // domain is bad. Allow cautiously and do NOT cache, so it gets a fair
+      // re-check once connectivity recovers rather than being stuck "invalid".
+      return { active: true, reason: `Local network/DNS resolver issue (${err.code || 'timeout'}) - allowed cautiously`, mx: [] };
     } else {
       reason = `Domain DNS lookup failed (${err.code || err.message})`;
     }
@@ -378,6 +393,7 @@ module.exports = {
   validateEmail,
   validateBatch,
   formatEmailContent,
+  isConnectivityError,
   domainCache,
   KNOWN_ACTIVE_DOMAINS,
   TYPO_DOMAINS,

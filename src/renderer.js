@@ -18,12 +18,33 @@ document.addEventListener('DOMContentLoaded', () => {
     stopRequested: false,
     pauseRequested: false,
     globalAttachmentPaths: [],
-    globalTemplate: null // { subject, body } loaded from BODY.txt when no Excel Subject/Body column is mapped
+    globalTemplate: null, // { subject, body } loaded from BODY.txt when no Excel Subject/Body column is mapped
+    contactRegistry: null // email -> { status, lastSentAt, ... } loaded from contacts_registry.json, for cross-campaign dedupe
   };
 
   // Schedule state (declared early so updateStartButtonState can reference it)
   let scheduleTimeoutId = null;
 
+  // Page Tabs: Compose / Send / Schedule / Tracking - self-contained, no
+  // dependency on anything defined below, so it's safe this early.
+  const pageTabBtns = document.querySelectorAll('.page-tab-btn');
+  pageTabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      pageTabBtns.forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.page-panel').forEach(p => p.classList.add('hidden'));
+      btn.classList.add('active');
+      const panel = document.getElementById('page-' + btn.dataset.page);
+      if (panel) panel.classList.remove('hidden');
+      try { localStorage.setItem('automail_active_page', btn.dataset.page); } catch (_) { }
+    });
+  });
+  try {
+    const savedPage = localStorage.getItem('automail_active_page');
+    if (savedPage) {
+      const savedBtn = document.querySelector(`.page-tab-btn[data-page="${savedPage}"]`);
+      if (savedBtn) savedBtn.click();
+    }
+  } catch (_) { }
 
   // DOM Elements
   const smtpEnginePanel = document.getElementById('smtpEnginePanel');
@@ -39,6 +60,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnTestSmtp = document.getElementById('btnTestSmtp');
   const smtpFeedback = document.getElementById('smtpFeedback');
   const smtpStatusBadge = document.getElementById('smtpStatusBadge');
+  const signInGate = document.getElementById('signInGate');
+  const appShell = document.getElementById('appShell');
+  const bodyPasteBox = document.getElementById('bodyPasteBox');
 
   // Initialize Email Signature from localStorage or signature.txt file (account-aware)
   function getSigStorageKey() {
@@ -100,16 +124,19 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadGlobalBodyTemplate() {
     const bodyFileStatus = document.getElementById('bodyFileStatus');
     if (!window.electronAPI || !window.electronAPI.loadBodyTemplateFile) return;
+    let fileContent = null;
     try {
       const res = await window.electronAPI.loadBodyTemplateFile();
-      state.globalTemplate = (res && res.success && res.content) ? parseBodyTemplateFile(res.content) : null;
+      fileContent = (res && res.success && res.content) ? res.content : null;
+      state.globalTemplate = fileContent ? parseBodyTemplateFile(fileContent) : null;
     } catch (_) {
       state.globalTemplate = null;
     }
+    if (bodyPasteBox) bodyPasteBox.value = fileContent || '';
     if (bodyFileStatus) {
       bodyFileStatus.textContent = state.globalTemplate
-        ? `Using Subject/Body from BODY.txt: "${state.globalTemplate.subject}"`
-        : 'BODY.txt not found — map Subject/Body columns from Excel instead.';
+        ? `Loaded from BODY.txt: "${state.globalTemplate.subject}" — edit above, it's used live.`
+        : 'BODY.txt not found — paste Subject/Body above, or map columns from Excel instead.';
     }
     buildCampaignLogs();
     renderLogTable();
@@ -117,11 +144,60 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStartButtonState();
   }
 
+  // Live edits to the paste box take effect immediately (debounced so typing/
+  // pasting a long body doesn't rebuild the whole recipient table on every keystroke).
+  if (bodyPasteBox) {
+    let bodyPasteDebounce = null;
+    bodyPasteBox.addEventListener('input', () => {
+      clearTimeout(bodyPasteDebounce);
+      bodyPasteDebounce = setTimeout(() => {
+        state.globalTemplate = parseBodyTemplateFile(bodyPasteBox.value);
+        const bodyFileStatus = document.getElementById('bodyFileStatus');
+        if (bodyFileStatus) {
+          bodyFileStatus.textContent = state.globalTemplate
+            ? `Using pasted Subject/Body: "${state.globalTemplate.subject}"`
+            : 'Paste Subject/Body above, or map columns from Excel instead.';
+        }
+        buildCampaignLogs();
+        renderLogTable();
+        updateMetrics();
+        updateStartButtonState();
+      }, 400);
+    });
+  }
+
   loadGlobalBodyTemplate();
 
   const btnReloadBodyFile = document.getElementById('btnReloadBodyFile');
   if (btnReloadBodyFile) {
     btnReloadBodyFile.addEventListener('click', loadGlobalBodyTemplate);
+  }
+
+  // Contact registry: cross-campaign memory of everyone ever emailed, used for
+  // dedupe (see buildCampaignLogs) and kept current after every send.
+  async function loadContactRegistry() {
+    if (!window.electronAPI || !window.electronAPI.loadRegistry) return;
+    try {
+      // Cheap and idempotent (skips emails already recorded) - keeps the
+      // registry current from campaign_log_*.json files on disk even if
+      // nobody ever clicks a dedicated "backfill" button.
+      if (window.electronAPI.backfillRegistry) await window.electronAPI.backfillRegistry();
+      const res = await window.electronAPI.loadRegistry();
+      state.contactRegistry = (res && res.success) ? res.registry : {};
+    } catch (_) {
+      state.contactRegistry = {};
+    }
+    buildCampaignLogs();
+    renderLogTable();
+    updateMetrics();
+    updateStartButtonState();
+  }
+
+  loadContactRegistry();
+
+  const chkSkipContacted = document.getElementById('chkSkipContacted');
+  if (chkSkipContacted) {
+    chkSkipContacted.addEventListener('change', loadContactRegistry);
   }
 
   const dropZone = document.getElementById('dropZone');
@@ -218,12 +294,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const result = await window.electronAPI.testSmtp(config);
 
       btnTestSmtp.disabled = false;
-      btnTestSmtp.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Test Connection`;
+      btnTestSmtp.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Sign In`;
 
       if (result.success) {
         state.smtpVerified = true;
         showSmtpFeedback(true, result.message);
         updateSmtpStatus(true);
+        enterAppShell('compose');
       } else {
         state.smtpVerified = false;
         showSmtpFeedback(false, result.error);
@@ -231,6 +308,38 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       updateStartButtonState();
     });
+  }
+
+  // Reveals the tab bar + app content, hiding the sign-in gate. Used both after
+  // a successful sign-in and by "Continue without signing in" (for anyone who
+  // just wants to check/edit/cancel an existing schedule or campaign history -
+  // those don't need fresh SMTP credentials).
+  function enterAppShell(tabName) {
+    if (!signInGate || !appShell) return;
+    signInGate.classList.add('hidden');
+    appShell.classList.remove('hidden');
+    const btnChangeAccount = document.getElementById('btnChangeAccount');
+    if (btnChangeAccount) btnChangeAccount.classList.remove('hidden');
+    const tabBtn = document.querySelector(`.page-tab-btn[data-page="${tabName}"]`);
+    if (tabBtn) tabBtn.click();
+  }
+
+  // "Change Account" - re-open the sign-in gate without losing anything else
+  const btnChangeAccount = document.getElementById('btnChangeAccount');
+  if (btnChangeAccount && signInGate && appShell) {
+    btnChangeAccount.addEventListener('click', () => {
+      appShell.classList.add('hidden');
+      signInGate.classList.remove('hidden');
+      btnChangeAccount.classList.add('hidden');
+    });
+  }
+
+  // "Continue without signing in" - browse Schedule/Tracking/History without
+  // verifying SMTP first. Sending/scheduling something new still requires real
+  // credentials (enforced separately by updateStartButtonState).
+  const btnSkipSignIn = document.getElementById('btnSkipSignIn');
+  if (btnSkipSignIn) {
+    btnSkipSignIn.addEventListener('click', () => enterAppShell('schedule'));
   }
 
   function getSmtpConfig() {
@@ -481,6 +590,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function buildCampaignLogs() {
+    // Nothing loaded this session (e.g. still starting up, or a restored
+    // background/scheduled campaign's log was just loaded from disk) - there's
+    // no Excel data to rebuild from, so leave whatever is in state.campaignLogs
+    // alone instead of wiping it back to empty.
+    if (state.rawRows.length === 0) return;
+
     const emailCol = mapEmail.value;
     const ccCol = mapCc ? mapCc.value : '';
     const bccCol = mapBcc ? mapBcc.value : '';
@@ -520,6 +635,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const parsedEmails = extractEmails(recipientRaw);
 
+      // Best-effort company name for the contact registry (follow-up template
+      // interpolation) - not required for sending, {Company} in topic/body is
+      // already interpolated above regardless of whether this resolves.
+      const companyName = row['Company'] || row['company'] || row['Company Name'] || '';
+
       if (shouldSplit && parsedEmails.length > 1) {
         // Expand multi-email cell into separate recipient entries in campaign log table
         parsedEmails.forEach(singleEmail => {
@@ -527,6 +647,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: currentId++,
             rowNumber: idx + 1,
             recipientEmail: singleEmail,
+            company: companyName,
             cc: ccRaw,
             bcc: bccRaw,
             topic: finalTopic,
@@ -542,6 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
           id: currentId++,
           rowNumber: idx + 1,
           recipientEmail: parsedEmails.length > 1 ? parsedEmails.join(', ') : recipientRaw,
+          company: companyName,
           cc: ccRaw,
           bcc: bccRaw,
           topic: finalTopic,
@@ -553,6 +675,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
     });
+
+    // Global dedupe: tag rows already contacted in a previous campaign (any sheet)
+    // so they're excluded from sending by default, per the "Skip previously-
+    // contacted recipients" checkbox.
+    if (chkSkipContacted && chkSkipContacted.checked && state.contactRegistry) {
+      state.campaignLogs.forEach(item => {
+        const key = (item.recipientEmail || '').trim().toLowerCase();
+        const entry = key && state.contactRegistry[key];
+        if (entry && item.status === 'pending') {
+          item.status = 'duplicate';
+          const when = entry.lastSentAt ? new Date(entry.lastSentAt).toLocaleDateString() : 'previously';
+          item.error = `Already contacted (${entry.status}, ${when})`;
+        }
+      });
+    }
   }
 
   function interpolateTemplate(templateStr, rowObject) {
@@ -689,6 +826,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return '<span class="badge badge-failed">✕ Failed</span>';
       case 'invalid':
         return '<span class="badge badge-invalid">⚠️ Inactive / Invalid</span>';
+      case 'duplicate':
+        return '<span class="badge badge-invalid">🔁 Already Contacted</span>';
       case 'sending':
         return '<span class="badge badge-sending">⌛ Sending...</span>';
       default:
@@ -792,8 +931,8 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let i = 0; i < state.campaignLogs.length; i++) {
       const item = state.campaignLogs[i];
 
-      // Skip already sent or invalid rows if re-starting
-      if (item.status === 'sent' || item.status === 'invalid') continue;
+      // Skip already sent, invalid, or previously-contacted (deduped) rows if re-starting
+      if (item.status === 'sent' || item.status === 'invalid' || item.status === 'duplicate') continue;
 
       // Handle Pause Request
       while (state.pauseRequested) {
@@ -861,10 +1000,16 @@ document.addEventListener('DOMContentLoaded', () => {
         item.status = 'sent';
         item.sentTime = new Date().toLocaleTimeString();
         item.error = '-';
+        if (window.electronAPI.recordSent) {
+          window.electronAPI.recordSent(item.recipientEmail, { company: item.company, subject: item.topic, body: item.body, cc: item.cc, bcc: item.bcc, attachmentPath: item.attachmentPath });
+        }
       } else {
         item.status = 'failed';
         item.sentTime = new Date().toLocaleTimeString();
         item.error = res.error;
+        if (window.electronAPI.recordFailed) {
+          window.electronAPI.recordFailed(item.recipientEmail, res.error, { company: item.company, subject: item.topic, body: item.body, cc: item.cc, bcc: item.bcc, attachmentPath: item.attachmentPath });
+        }
       }
 
       updateSingleRowUI(item);
@@ -978,6 +1123,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Check Bounces: on-demand IMAP scan (no recurring task) - marks any
+  // recipient in the currently-loaded table whose address shows up in a
+  // bounce notification from the last 30 days as 'failed'.
+  const btnCheckBounces = document.getElementById('btnCheckBounces');
+  if (btnCheckBounces) {
+    btnCheckBounces.addEventListener('click', async () => {
+      const smtpConfig = getSmtpConfig();
+      if (!smtpConfig.host || !smtpConfig.user || !smtpConfig.pass) {
+        alert('Please fill out your SMTP Server, User, and Password credentials first (needed to read your inbox via IMAP).');
+        return;
+      }
+
+      btnCheckBounces.disabled = true;
+      const originalHtml = btnCheckBounces.innerHTML;
+      btnCheckBounces.innerHTML = 'Checking…';
+
+      try {
+        const knownRecipients = state.campaignLogs.map(l => l.recipientEmail).filter(Boolean);
+        const res = await window.electronAPI.checkBounces(smtpConfig, knownRecipients);
+        if (!res || !res.success) {
+          alert(`Bounce check failed: ${res && res.error ? res.error : 'Unknown error'}. Make sure IMAP is enabled in your Gmail settings (Forwarding and POP/IMAP).`);
+          return;
+        }
+
+        const bouncedEmails = new Set((res.bounces || []).map(b => b.email.toLowerCase()));
+        let matched = 0;
+        state.campaignLogs.forEach(item => {
+          const key = (item.recipientEmail || '').trim().toLowerCase();
+          if (bouncedEmails.has(key) && item.status !== 'failed') {
+            const hit = res.bounces.find(b => b.email.toLowerCase() === key);
+            item.status = 'failed';
+            item.error = hit ? hit.reason : 'Bounced';
+            updateSingleRowUI(item);
+            matched++;
+          }
+        });
+        updateMetrics();
+
+        if (bouncedEmails.size === 0) {
+          showScheduleToast('No bounce notifications found in the last 30 days.');
+        } else {
+          showScheduleToast(`Found ${bouncedEmails.size} bounce${bouncedEmails.size === 1 ? '' : 's'} in your inbox (labeled "address-not-found") — ${matched} marked failed in this table.`);
+        }
+      } finally {
+        btnCheckBounces.disabled = false;
+        btnCheckBounces.innerHTML = originalHtml;
+      }
+    });
   }
 
   // Export Report to Excel
@@ -1099,7 +1294,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===========================================================================
   const scheduleDateTime = document.getElementById('scheduleDateTime');
   const btnSchedule = document.getElementById('btnSchedule');
+  const btnScheduleLabel = document.getElementById('btnScheduleLabel');
   const btnCancelSchedule = document.getElementById('btnCancelSchedule');
+  const btnSendNow = document.getElementById('btnSendNow');
+  const scheduleEditHint = document.getElementById('scheduleEditHint');
+  const scheduleCreationBlock = document.getElementById('scheduleCreationBlock');
+  const multiDayManagerHint = document.getElementById('multiDayManagerHint');
   const scheduleCountdownBox = document.getElementById('scheduleCountdownBox');
   const scheduleCountdownLabel = document.getElementById('scheduleCountdownLabel');
   const scheduleCountdownTimer = document.getElementById('scheduleCountdownTimer');
@@ -1143,8 +1343,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function generateBatches(startDate, logs, dailyLimit, weekdaysOnly) {
-    // Only schedule active/deliverable emails (exclude invalid addresses to protect quota)
-    const activeLogs = logs.filter(l => l.status !== 'invalid');
+    // Only schedule active/deliverable emails (exclude invalid or already-contacted addresses)
+    const activeLogs = logs.filter(l => l.status !== 'invalid' && l.status !== 'duplicate');
     const total = activeLogs.length;
     const numBatches = Math.ceil(total / dailyLimit) || 1;
     const batches = [];
@@ -1185,7 +1385,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (batchOptionsSubRow) batchOptionsSubRow.style.opacity = '1';
 
     const val = scheduleDateTime.value;
-    const total = state.campaignLogs.filter(l => l.status !== 'invalid').length;
+    const total = state.campaignLogs.filter(l => l.status !== 'invalid' && l.status !== 'duplicate').length;
     const limit = parseInt(inputDailyLimit.value, 10) || 500;
     const weekdays = chkWeekdaysOnly.checked;
 
@@ -1234,10 +1434,12 @@ document.addEventListener('DOMContentLoaded', () => {
     batches.forEach(b => {
       const row = document.createElement('div');
       row.className = 'active-batch-row';
+      row.dataset.batchNumber = b.batchNumber;
       const timeStr = new Date(b.isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       let tagClass = 'pending';
       let tagText = 'Scheduled';
+      let isPending = b.status !== 'completed';
 
       if (b.status === 'completed') {
         row.classList.add('completed');
@@ -1250,19 +1452,231 @@ document.addEventListener('DOMContentLoaded', () => {
         tagText = 'Next Up';
       }
 
+      const actionsHtml = isPending ? `
+        <div class="batch-row-actions">
+          <button type="button" class="batch-action-btn" data-action="edit" title="Change this batch's date/time">✏️</button>
+          <button type="button" class="batch-action-btn" data-action="sendnow" title="Send this batch right now">🚀</button>
+          <button type="button" class="batch-action-btn" data-action="cancel" title="Cancel this batch">✕</button>
+        </div>
+      ` : '';
+
+      const editRowHtml = isPending ? `
+        <div class="batch-edit-row hidden" data-edit-row>
+          <input type="datetime-local" class="schedule-input batch-edit-input" value="${b.isoString.slice(0, 16)}">
+          <button type="button" class="btn btn-accent btn-sm" data-action="save-edit">Save</button>
+          <button type="button" class="btn btn-outline btn-sm" data-action="cancel-edit">Cancel</button>
+        </div>
+      ` : '';
+
       row.innerHTML = `
-        <div class="active-batch-left">
-          <div class="active-batch-indicator"></div>
-          <div>
-            <div class="active-batch-name">Batch #${b.batchNumber} — ${b.dayLabel}</div>
-            <div class="active-batch-subtext">${timeStr} • ${b.items.length} recipients</div>
+        <div class="active-batch-main">
+          <div class="active-batch-left">
+            <div class="active-batch-indicator"></div>
+            <div>
+              <div class="active-batch-name">Batch #${b.batchNumber} — ${b.dayLabel}</div>
+              <div class="active-batch-subtext">${timeStr} • ${b.items.length} recipients</div>
+            </div>
+          </div>
+          <div class="active-batch-right">
+            <span class="batch-tag ${tagClass}">${tagText}</span>
+            ${actionsHtml}
           </div>
         </div>
-        <div class="active-batch-right">
-          <span class="batch-tag ${tagClass}">${tagText}</span>
-        </div>
+        ${editRowHtml}
       `;
       activeBatchTimeline.appendChild(row);
+    });
+  }
+
+  // Per-batch management: edit time / send now / cancel a single day's batch
+  // directly from the timeline, independent of the other days.
+  const dayNamesForBatch = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const monthNamesForBatch = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  async function activateNextArmedBatch(data) {
+    // Re-arm the OS task + in-app timer for whichever batch is now first-pending.
+    const nextPending = data.batches.find(b => b.status === 'pending');
+    if (nextPending) {
+      await window.electronAPI.createOsTask({ isoString: nextPending.isoString });
+      const msUntil = new Date(nextPending.isoString) - Date.now();
+      armScheduleTimeout(nextPending.isoString, Math.max(0, msUntil));
+      startCountdownUI(nextPending.isoString);
+      applyScheduledUI(nextPending.isoString, data);
+    } else {
+      await window.electronAPI.clearSchedule();
+      resetScheduleUI();
+      updateStartButtonState();
+    }
+  }
+
+  async function cancelSingleBatch(batchNumber) {
+    const schedRes = await window.electronAPI.loadSchedule();
+    if (!schedRes.success || !schedRes.data || !Array.isArray(schedRes.data.batches)) return;
+    const data = schedRes.data;
+    const batch = data.batches.find(b => b.batchNumber === batchNumber);
+    if (!batch) return;
+    if (!confirm(`Cancel Batch #${batchNumber} (${batch.dayLabel})? Its ${batch.items.length} recipients won't be emailed by this schedule.`)) return;
+
+    const wasFront = data.batches.find(b => b.status === 'pending') === batch;
+    data.batches = data.batches.filter(b => b.batchNumber !== batchNumber);
+
+    if (wasFront) {
+      if (scheduleTimeoutId) { clearTimeout(scheduleTimeoutId); scheduleTimeoutId = null; }
+      await window.electronAPI.deleteOsTask();
+    }
+
+    if (!data.batches.some(b => b.status === 'pending')) {
+      await window.electronAPI.clearSchedule();
+      resetScheduleUI();
+      updateStartButtonState();
+      showScheduleToast(`Batch #${batchNumber} cancelled. No batches remain — schedule cleared.`);
+      return;
+    }
+
+    await window.electronAPI.saveSchedule(data);
+    if (wasFront) {
+      await activateNextArmedBatch(data);
+    } else {
+      renderActiveBatchTimeline(data.batches);
+    }
+    showScheduleToast(`Batch #${batchNumber} cancelled.`);
+  }
+
+  async function updateSingleBatchTime(batchNumber, newLocalValue) {
+    const targetDate = new Date(newLocalValue);
+    if (!newLocalValue || isNaN(targetDate.getTime()) || targetDate <= new Date()) {
+      alert('Please pick a future date and time.');
+      return;
+    }
+
+    const schedRes = await window.electronAPI.loadSchedule();
+    if (!schedRes.success || !schedRes.data || !Array.isArray(schedRes.data.batches)) return;
+    const data = schedRes.data;
+    const batch = data.batches.find(b => b.batchNumber === batchNumber);
+    if (!batch) return;
+
+    const wasFront = data.batches.find(b => b.status === 'pending') === batch;
+    batch.isoString = targetDate.toISOString();
+    batch.dayLabel = `${dayNamesForBatch[targetDate.getDay()]}, ${monthNamesForBatch[targetDate.getMonth()]} ${targetDate.getDate()}`;
+
+    await window.electronAPI.saveSchedule(data);
+
+    if (wasFront) {
+      await window.electronAPI.createOsTask({ isoString: batch.isoString });
+      const msUntil = targetDate - Date.now();
+      armScheduleTimeout(batch.isoString, Math.max(0, msUntil));
+      startCountdownUI(batch.isoString);
+      applyScheduledUI(batch.isoString, data);
+    } else {
+      renderActiveBatchTimeline(data.batches);
+    }
+    showScheduleToast(`Batch #${batchNumber} rescheduled to ${targetDate.toLocaleString()}.`);
+  }
+
+  async function sendSingleBatchNow(batchNumber) {
+    if (state.status === 'running') { alert('A campaign is already sending. Please wait for it to finish.'); return; }
+
+    const schedRes = await window.electronAPI.loadSchedule();
+    if (!schedRes.success || !schedRes.data || !Array.isArray(schedRes.data.batches)) return;
+    const data = schedRes.data;
+    const batch = data.batches.find(b => b.batchNumber === batchNumber);
+    if (!batch || batch.status !== 'pending') return;
+    if (!confirm(`Send Batch #${batchNumber} (${batch.dayLabel}, ${batch.items.length} emails) right now?`)) return;
+
+    const wasFront = data.batches.find(b => b.status === 'pending') === batch;
+    if (wasFront) {
+      if (scheduleTimeoutId) { clearTimeout(scheduleTimeoutId); scheduleTimeoutId = null; }
+      await window.electronAPI.deleteOsTask();
+    }
+
+    const smtpConfig = data.smtpConfig;
+    const signatureStr = data.signature || (emailSignature ? emailSignature.value : '');
+    const delaySec = parseInt(data.emailDelay, 10) || 0;
+
+    for (const item of batch.items) {
+      if (item.status === 'sent') continue;
+      const formatted = formatEmailContent(item.body, signatureStr);
+      const mailData = {
+        to: item.recipientEmail,
+        cc: item.cc || '',
+        bcc: item.bcc || '',
+        subject: item.topic,
+        text: formatted.text,
+        html: formatted.html,
+        attachmentPath: item.attachmentPath,
+        isHtml: true
+      };
+      const res = await window.electronAPI.sendEmail(smtpConfig, mailData);
+      item.status = res.success ? 'sent' : 'failed';
+      item.sentTime = new Date().toLocaleTimeString();
+      item.error = res.success ? '-' : res.error;
+
+      if (res.success && window.electronAPI.recordSent) {
+        window.electronAPI.recordSent(item.recipientEmail, { company: item.company, subject: item.topic, body: item.body, cc: item.cc, bcc: item.bcc, attachmentPath: item.attachmentPath });
+      } else if (!res.success && window.electronAPI.recordFailed) {
+        window.electronAPI.recordFailed(item.recipientEmail, res.error, { company: item.company, subject: item.topic, body: item.body, cc: item.cc, bcc: item.bcc, attachmentPath: item.attachmentPath });
+      }
+
+      const mainItem = state.campaignLogs.find(l => l.id === item.id);
+      if (mainItem) {
+        mainItem.status = item.status;
+        mainItem.sentTime = item.sentTime;
+        mainItem.error = item.error;
+        updateSingleRowUI(mainItem);
+      }
+      updateMetrics();
+
+      if (delaySec > 0) await sleep(delaySec * 1000);
+    }
+
+    batch.status = 'completed';
+    batch.sentAt = new Date().toISOString();
+    batch.sentCount = batch.items.filter(i => i.status === 'sent').length;
+    batch.failCount = batch.items.filter(i => i.status === 'failed').length;
+
+    if (!data.batches.some(b => b.status === 'pending')) {
+      await window.electronAPI.clearSchedule();
+      resetScheduleUI();
+      updateStartButtonState();
+    } else {
+      await window.electronAPI.saveSchedule(data);
+      if (wasFront) {
+        await activateNextArmedBatch(data);
+      } else {
+        renderActiveBatchTimeline(data.batches);
+      }
+    }
+    showScheduleToast(`Batch #${batchNumber} sent now — ${batch.sentCount} sent, ${batch.failCount} failed.`);
+  }
+
+  if (activeBatchTimeline) {
+    activeBatchTimeline.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const row = e.target.closest('.active-batch-row');
+      if (!row) return;
+      const batchNumber = parseInt(row.dataset.batchNumber, 10);
+      const editRow = row.querySelector('[data-edit-row]');
+
+      switch (btn.dataset.action) {
+        case 'edit':
+          if (editRow) editRow.classList.toggle('hidden');
+          break;
+        case 'cancel-edit':
+          if (editRow) editRow.classList.add('hidden');
+          break;
+        case 'save-edit': {
+          const input = row.querySelector('.batch-edit-input');
+          updateSingleBatchTime(batchNumber, input ? input.value : '');
+          break;
+        }
+        case 'sendnow':
+          sendSingleBatchNow(batchNumber);
+          break;
+        case 'cancel':
+          cancelSingleBatch(batchNumber);
+          break;
+      }
     });
   }
 
@@ -1291,15 +1705,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyScheduledUI(isoString, savedData) {
     const d = new Date(isoString);
+    const isMultiBatch = !!(savedData && Array.isArray(savedData.batches) && savedData.batches.length > 0);
+
     scheduleCountdownBox.classList.remove('hidden');
     scheduleBadge.classList.remove('hidden');
-    btnSchedule.classList.add('hidden');
-    btnCancelSchedule.classList.remove('hidden');
-    scheduleDateTime.disabled = true;
-    if (chkDailyBatches) chkDailyBatches.disabled = true;
-    if (inputDailyLimit) inputDailyLimit.disabled = true;
-    if (chkWeekdaysOnly) chkWeekdaysOnly.disabled = true;
     btnStart.disabled = true;
+
+    // Multi-day campaigns are managed per-batch in the timeline below (edit/send/cancel
+    // each day individually) — the single top-level Update/Send Now/Cancel controls only
+    // make sense for a one-shot (non-batched) schedule, so swap between the two views.
+    if (isMultiBatch) {
+      if (scheduleCreationBlock) scheduleCreationBlock.classList.add('hidden');
+      if (multiDayManagerHint) multiDayManagerHint.style.display = 'flex';
+      if (scheduleEditHint) scheduleEditHint.style.display = 'none';
+      btnCancelSchedule.classList.add('hidden');
+      if (btnSendNow) btnSendNow.classList.add('hidden');
+    } else {
+      if (scheduleCreationBlock) scheduleCreationBlock.classList.remove('hidden');
+      if (multiDayManagerHint) multiDayManagerHint.style.display = 'none';
+      if (btnScheduleLabel) btnScheduleLabel.textContent = 'Update Time';
+      btnCancelSchedule.classList.remove('hidden');
+      if (btnSendNow) btnSendNow.classList.remove('hidden');
+      if (scheduleEditHint) scheduleEditHint.style.display = 'flex';
+    }
 
     if (batchPreviewBox) batchPreviewBox.classList.add('hidden');
 
@@ -1323,6 +1751,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (scheduleDateTime.value !== isoString.slice(0, 16)) {
       scheduleDateTime.value = isoString.slice(0, 16);
     }
+    // Re-evaluate so "Update Time" is only clickable once the field holds a future value
+    btnSchedule.disabled = !scheduleDateTime.value || (new Date(scheduleDateTime.value) <= new Date()) || state.campaignLogs.length === 0;
   }
 
   function armScheduleTimeout(isoString, msUntil) {
@@ -1358,6 +1788,11 @@ document.addEventListener('DOMContentLoaded', () => {
     scheduleCountdownBox.classList.add('hidden');
     scheduleBadge.classList.add('hidden');
     btnCancelSchedule.classList.add('hidden');
+    if (btnSendNow) btnSendNow.classList.add('hidden');
+    if (scheduleEditHint) scheduleEditHint.style.display = 'none';
+    if (multiDayManagerHint) multiDayManagerHint.style.display = 'none';
+    if (scheduleCreationBlock) scheduleCreationBlock.classList.remove('hidden');
+    if (btnScheduleLabel) btnScheduleLabel.textContent = 'Schedule';
     btnSchedule.classList.remove('hidden');
     scheduleDateTime.disabled = false;
     if (chkDailyBatches) chkDailyBatches.disabled = false;
@@ -1420,11 +1855,15 @@ document.addEventListener('DOMContentLoaded', () => {
         firstIso = batches[0].isoString;
       }
 
-      // 1. Build payload to persist
+      // 1. Build payload to persist. When split into batches, batches[].items already
+      // holds every recipient - duplicating the full list again in campaignLogs nearly
+      // doubles the file (and the IPC payload read back on every app launch) for no
+      // reason, which gets bad fast at thousands of recipients. Only store it flat
+      // for the legacy (non-batched) single-schedule case.
       const payload = {
         isoString: firstIso,
         smtpConfig: smtpConfig,
-        campaignLogs: JSON.parse(JSON.stringify(state.campaignLogs)),
+        campaignLogs: useBatches ? [] : JSON.parse(JSON.stringify(state.campaignLogs)),
         emailDelay: parseInt(emailDelay.value, 10) || 0,
         dailyLimit: dailyLimit,
         weekdaysOnly: weekdays,
@@ -1476,6 +1915,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ── Send Now button — skip the wait, whether the schedule hasn't fired yet
+  // or the pick time already passed while the app was closed ─────────────────
+  if (btnSendNow) {
+    btnSendNow.addEventListener('click', async () => {
+      if (state.status === 'running') return;
+      if (!confirm('Send this campaign right now instead of waiting for the scheduled time?')) return;
+
+      if (scheduleTimeoutId) { clearTimeout(scheduleTimeoutId); scheduleTimeoutId = null; }
+      await window.electronAPI.deleteOsTask();
+      await window.electronAPI.clearSchedule();
+      resetScheduleUI();
+      updateStartButtonState();
+      btnStart.classList.remove('hidden');
+      startCampaign();
+    });
+  }
+
   // ── On startup: restore background logs or pending schedules ───────────────
   (async () => {
     // 1. Check if a background campaign completed while app was closed
@@ -1522,10 +1978,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check if multi-batch
     if (Array.isArray(saved.batches) && saved.batches.length > 0) {
-      if (saved.campaignLogs && saved.campaignLogs.length > 0 && state.campaignLogs.length === 0) {
-        state.campaignLogs = saved.campaignLogs;
-        renderLogTable();
-        updateMetrics();
+      if (state.campaignLogs.length === 0) {
+        // campaignLogs is stored empty for batched schedules (see btnSchedule handler) -
+        // batches[].items is the authoritative full list, so rebuild the table from that.
+        const flatItems = saved.campaignLogs && saved.campaignLogs.length > 0
+          ? saved.campaignLogs
+          : saved.batches.flatMap(b => b.items || []);
+        if (flatItems.length > 0) {
+          state.campaignLogs = flatItems;
+          renderLogTable();
+          updateMetrics();
+        }
       }
 
       const nextPending = saved.batches.find(b => b.status === 'pending');
@@ -1558,6 +2021,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       applyScheduledUI(saved.isoString, saved);
       await window.electronAPI.deleteOsTask();
+      scheduleCountdownLabel.textContent = 'Scheduled time already passed';
+      scheduleCountdownTimer.textContent = 'MISSED';
+      scheduleTargetTime.textContent = `Was set for: ${targetDate.toLocaleString()} — click Send Now, or pick a new time and Update.`;
+      showScheduleToast('⚠️ You missed the scheduled send time. Click Send Now to send immediately, or pick a new time.');
       return;
     }
 
